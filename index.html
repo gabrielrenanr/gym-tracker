@@ -5,10 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="GymTracker" />
   <meta name="theme-color" content="#1a1a1a" />
+  <meta name="description" content="Acompanhe seus treinos, histórico e progresso na academia." />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
   <title>GymTracker</title>
   <link rel="stylesheet" href="styles.css" />
-  <link rel="apple-touch-icon" href="icon.png" />
 </head>
 <body>
   <div id="app">
@@ -100,5 +104,14 @@
   </div>
 
   <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(() => console.log('SW registered'))
+          .catch(err => console.log('SW failed:', err));
+      });
+    }
+  </script>
 </body>
 </html>
