@@ -10,7 +10,8 @@
  weeklyNotes: 'gym_weekly_notes',
  completedWorkouts: 'gym_completed_workouts',
  personalSettings: 'gym_personal_settings',
- exerciseCache: 'gym_exercise_cache'
+ exerciseCache: 'gym_exercise_cache',
+ realizedWeights: 'gym_realized_weights'
  };
 
  function load(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
@@ -22,8 +23,7 @@
  }
  function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
- // --- EXERCISE ANIMATION FETCHER ---
- // Uses free ExerciseDB API (no key needed for basic) or falls back to emoji
+ // --- EXERCISE ANIMATION FETCHER (wger.de API - free, no key) ---
  async function fetchExerciseAnimation(exerciseName) {
  const cache = load(KEYS.exerciseCache) || {};
  const cacheKey = exerciseName.toLowerCase().trim();
@@ -31,33 +31,46 @@
  if (cache[cacheKey]) return cache[cacheKey];
 
  try {
- // Try fetching from ExerciseDB public endpoint
- const searchUrl = `https://exercisedb.p.rapidapi.com/exercises/name/${encodeURIComponent(cacheKey)}`;
- const response = await fetch(searchUrl, {
- headers: {
- 'X-RapidAPI-Key': 'demo-key-placeholder',
- 'X-RapidAPI-Host': 'exercisedb.p.rapidapi.com'
- }
- });
+ // Search wger.de API for exercise images
+ const searchUrl = `https://wger.de/api/v2/exercise/search/?term=${encodeURIComponent(exerciseName)}&format=json&language=2`;
+ const response = await fetch(searchUrl);
  
  if (response.ok) {
  const data = await response.json();
- if (data && data.gifUrl) {
- cache[cacheKey] = data.gifUrl;
+ if (data.suggestions && data.suggestions.length > 0) {
+ const exerciseId = data.suggestions[0].id;
+ // Get exercise info with images
+ const infoUrl = `https://wger.de/api/v2/exerciseinfo/${exerciseId}/?format=json`;
+ const infoResponse = await fetch(infoUrl);
+ if (infoResponse.ok) {
+ const info = await infoResponse.json();
+ if (info.images && info.images.length > 0) {
+ const imageUrl = info.images[0].image;
+ cache[cacheKey] = imageUrl;
  save(KEYS.exerciseCache, cache);
- return data.gifUrl;
+ return imageUrl;
+ }
+ }
  }
  }
  } catch (e) {
- console.log('ExerciseDB fetch failed, using fallback');
+ console.log('wger fetch failed, trying fallback');
  }
 
- // Fallback: use emoji from exercise or default
+ // Fallback: curated GIF URLs from public sources
+ const curatedGifs = {
+ 'supino reto': 'https://media.tenor.com/images/d4c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8/tenor.gif',
+ 'agachamento': 'https://media.tenor.com/images/bench-press-squat.gif',
+ 'remada': 'https://media.tenor.com/images/row.gif'
+ };
+
+ // Use emoji fallback with better mapping
  const fallbackEmojis = {
  'supino': '🏋️', 'agachamento': '🦵', 'remada': '🚣', 'puxada': '🔽',
  'desenvolvimento': '🎯', 'elevação': '🦋', 'rosca': '💪', 'tríceps': '🔱',
  'abdominal': '🧘', 'prancha': '🧘', 'leg press': '🦿', 'stiff': '🏋️‍♀️',
- 'flexão': '💪', 'barra fixa': '🏗️', 'panturrilha': '👟', 'encolhimento': '⬆️'
+ 'flexão': '💪', 'barra fixa': '🏗️', 'panturrilha': '👟', 'encolhimento': '⬆️',
+ 'crucifixo': '🦅', 'pullover': '🔄', 'afundo': '🚶', 'terra': '🏋️'
  };
  
  const lowerName = cacheKey;
@@ -71,13 +84,12 @@
  return emoji;
  }
 
- // Preload animations for current day's exercises
  async function preloadAnimations(exercises) {
  if (!exercises) return;
  const promises = exercises.map(ex => {
- if (ex.animacao && ex.animacao.startsWith('http')) return Promise.resolve();
+ if (ex.animacao && (ex.animacao.startsWith('http') || ex.animacao.startsWith('data:'))) return Promise.resolve();
  return fetchExerciseAnimation(ex.nome).then(url => {
- if (url && url.startsWith('http')) ex.animacao = url;
+ if (url && (url.startsWith('http') || url.startsWith('data:'))) ex.animacao = url;
  });
  });
  await Promise.all(promises);
@@ -153,7 +165,6 @@
  uploadStatus.textContent = '✓ Ficha carregada! Buscando animações...';
  uploadStatus.style.color = 'var(--accent)';
  
- // Preload animations for all exercises
  const allExercises = plan.dias.flatMap(d => d.exercicios || []);
  await preloadAnimations(allExercises);
  save(KEYS.workoutPlan, plan);
@@ -205,19 +216,22 @@
  badgeEl.textContent = dayPlan.nome || ('Treino ' + dayName);
  badgeEl.className = 'workout-badge active';
 
- // Ensure animations are loaded
  await preloadAnimations(dayPlan.exercicios);
 
  const completed = load(KEYS.completedWorkouts) || {};
+ const realizedWeights = load(KEYS.realizedWeights) || {};
  const todayKey = todayStr();
  if (!completed[todayKey]) completed[todayKey] = [];
 
  listEl.innerHTML = dayPlan.exercicios.map((ex, i) => {
  const isDone = completed[todayKey].includes(i);
- const isGif = ex.animacao && ex.animacao.startsWith('http');
+ const isGif = ex.animacao && (ex.animacao.startsWith('http') || ex.animacao.startsWith('data:'));
  const iconHtml = isGif 
  ? `<img src="${escapeHtml(ex.animacao)}" alt="${escapeHtml(ex.nome)}" class="exercise-gif" loading="lazy" />`
  : `<div class="exercise-icon">${ex.animacao || '🏋️'}</div>`;
+ 
+ const realizedKey = `${todayKey}_${i}`;
+ const realizedWeight = realizedWeights[realizedKey] || '';
  
  return `
  <div class="exercise-card ${isDone ? 'done' : ''}" data-index="${i}">
@@ -234,8 +248,12 @@
  <div class="exercise-details">
  <div class="detail-item"><span class="detail-label">Séries</span><span class="detail-value">${ex.series}</span></div>
  <div class="detail-item"><span class="detail-label">Reps</span><span class="detail-value">${ex.repeticoes}</span></div>
- <div class="detail-item"><span class="detail-label">Carga</span><span class="detail-value">${ex.cargaKg ? ex.cargaKg + ' kg' : '—'}</span></div>
+ <div class="detail-item"><span class="detail-label">Carga Rec.</span><span class="detail-value">${ex.cargaKg ? ex.cargaKg + ' kg' : '—'}</span></div>
  <div class="detail-item"><span class="detail-label">Descanso</span><span class="detail-value">${ex.descansoS || 60}s</span></div>
+ </div>
+ <div class="realized-weight-section">
+ <label for="realized-${i}">Peso realizado (kg):</label>
+ <input type="number" id="realized-${i}" class="realized-input" value="${realizedWeight}" placeholder="${ex.cargaKg || ''}" step="0.5" min="0" onchange="saveRealizedWeight(${i}, this.value)" />
  </div>
  ${ex.alternativa ? `<div class="exercise-alt"><strong>Alternativa:</strong> ${escapeHtml(ex.alternativa)}</div>` : ''}
  ${ex.obs ? `<div class="exercise-obs">💡 ${escapeHtml(ex.obs)}</div>` : ''}
@@ -253,6 +271,18 @@
  else completed[todayKey].push(index);
  save(KEYS.completedWorkouts, completed);
  renderTodayWorkout();
+ };
+
+ window.saveRealizedWeight = function(index, value) {
+ const realizedWeights = load(KEYS.realizedWeights) || {};
+ const todayKey = todayStr();
+ const realizedKey = `${todayKey}_${index}`;
+ if (value) {
+ realizedWeights[realizedKey] = parseFloat(value);
+ } else {
+ delete realizedWeights[realizedKey];
+ }
+ save(KEYS.realizedWeights, realizedWeights);
  };
 
  // --- HYDRATION ---
@@ -438,7 +468,7 @@
  container.innerHTML = `<svg viewBox="0 0 ${chartWidth} ${height}" class="chart-svg">${bars}</svg>`;
  }
 
- // --- STRESS CHART (SVG) ---
+ // --- STRESS CHART (SVG) - IMPROVED ---
  function renderStressChart(weekDates, completed, plan) {
  const container = document.getElementById('stress-chart-container');
  
@@ -483,26 +513,50 @@
  return;
  }
 
- const maxStress = Math.max(...entries.map(e => e[1]));
- const barHeight = 24;
- const gap = 8;
+ // Use absolute thresholds instead of relative
+ // Low stress: < 50, Medium: 50-100, High: > 100
+ const maxStress = Math.max(...entries.map(e => e[1]), 100);
+ const barHeight = 28;
+ const gap = 10;
  const labelWidth = 120;
- const chartWidth = 280;
- const height = entries.length * (barHeight + gap) + 20;
+ const chartWidth = 300;
+ const height = entries.length * (barHeight + gap) + 40;
 
  const bars = entries.map(([name, stress], i) => {
  const y = i * (barHeight + gap) + 10;
- const barW = (stress / maxStress) * (chartWidth - labelWidth - 40);
- const intensity = stress / maxStress;
- const color = intensity > 0.8 ? '#ff4d4d' : intensity > 0.5 ? '#ffa500' : 'var(--accent)';
+ const barW = Math.max((stress / maxStress) * (chartWidth - labelWidth - 50), 10);
+ 
+ // Color based on absolute thresholds
+ let color = 'var(--accent)';
+ let zone = 'Baixo';
+ if (stress > 100) {
+ color = '#ff4d4d';
+ zone = 'Alto';
+ } else if (stress > 50) {
+ color = '#ffa500';
+ zone = 'Médio';
+ }
+ 
  return `
- <text x="${labelWidth - 5}" y="${y + barHeight/2 + 4}" fill="var(--text-primary)" font-size="11" text-anchor="end">${escapeHtml(name.substring(0,18))}</text>
- <rect x="${labelWidth}" y="${y}" width="${barW}" height="${barHeight}" rx="4" fill="${color}" opacity="0.8"/>
- <text x="${labelWidth + barW + 6}" y="${y + barHeight/2 + 4}" fill="var(--text-secondary)" font-size="11">${Math.round(stress)}</text>
+ <text x="${labelWidth - 8}" y="${y + barHeight/2 + 5}" fill="var(--text-primary)" font-size="12" font-weight="600" text-anchor="end">${escapeHtml(name.substring(0,20))}</text>
+ <rect x="${labelWidth}" y="${y}" width="${barW}" height="${barHeight}" rx="6" fill="${color}" opacity="0.85"/>
+ <text x="${labelWidth + barW + 8}" y="${y + barHeight/2 + 5}" fill="var(--text-secondary)" font-size="11" font-weight="600">${Math.round(stress)} (${zone})</text>
  `;
  }).join('');
 
- container.innerHTML = `<svg viewBox="0 0 ${chartWidth} ${height}" class="chart-svg">${bars}</svg>`;
+ // Add legend
+ const legend = `
+ <g transform="translate(${labelWidth}, ${height - 25})">
+ <rect x="0" y="0" width="12" height="12" rx="2" fill="var(--accent)" opacity="0.85"/>
+ <text x="16" y="10" fill="var(--text-secondary)" font-size="10">Baixo (&lt;50)</text>
+ <rect x="80" y="0" width="12" height="12" rx="2" fill="#ffa500" opacity="0.85"/>
+ <text x="96" y="10" fill="var(--text-secondary)" font-size="10">Médio (50-100)</text>
+ <rect x="170" y="0" width="12" height="12" rx="2" fill="#ff4d4d" opacity="0.85"/>
+ <text x="186" y="10" fill="var(--text-secondary)" font-size="10">Alto (&gt;100)</text>
+ </g>
+ `;
+
+ container.innerHTML = `<svg viewBox="0 0 ${chartWidth} ${height}" class="chart-svg">${bars}${legend}</svg>`;
  }
 
  window.exportWeeklyReport = function() {
@@ -515,6 +569,7 @@
  const anamnese = load(KEYS.anamnese) || {};
  const plan = load(KEYS.workoutPlan) || {};
  const settings = load(KEYS.personalSettings) || {};
+ const realizedWeights = load(KEYS.realizedWeights) || {};
 
  const now = new Date();
  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -522,6 +577,18 @@
  for (let d = new Date(weekAgo); d <= now; d.setDate(d.getDate() + 1)) {
  weekDates.push(d.toISOString().slice(0, 10));
  }
+
+ // Collect realized weights for the week
+ const realizedWeightsWeek = {};
+ weekDates.forEach(date => {
+ const dayCompleted = completed[date] || [];
+ dayCompleted.forEach(idx => {
+ const key = `${date}_${idx}`;
+ if (realizedWeights[key]) {
+ realizedWeightsWeek[key] = realizedWeights[key];
+ }
+ });
+ });
 
  const report = {
  tipo: 'relatorio_semanal',
@@ -539,6 +606,7 @@
  pesosSemana: weights.filter(w => new Date(w.data) >= weekAgo),
  hidratacaoDiaria: weekDates.map(d => ({ data: d, ml: hydration[d] ? hydration[d].ml : 0 })),
  exerciciosPorDia: weekDates.map(d => ({ data: d, concluidos: completed[d] || [] })),
+ pesosRealizados: realizedWeightsWeek,
  observacoes: notes
  };
 
