@@ -9,7 +9,8 @@
  weightLog: 'gym_weight_log',
  weeklyNotes: 'gym_weekly_notes',
  completedWorkouts: 'gym_completed_workouts',
- personalSettings: 'gym_personal_settings'
+ personalSettings: 'gym_personal_settings',
+ exerciseCache: 'gym_exercise_cache'
  };
 
  function load(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
@@ -21,6 +22,67 @@
  }
  function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+ // --- EXERCISE ANIMATION FETCHER ---
+ // Uses free ExerciseDB API (no key needed for basic) or falls back to emoji
+ async function fetchExerciseAnimation(exerciseName) {
+ const cache = load(KEYS.exerciseCache) || {};
+ const cacheKey = exerciseName.toLowerCase().trim();
+ 
+ if (cache[cacheKey]) return cache[cacheKey];
+
+ try {
+ // Try fetching from ExerciseDB public endpoint
+ const searchUrl = `https://exercisedb.p.rapidapi.com/exercises/name/${encodeURIComponent(cacheKey)}`;
+ const response = await fetch(searchUrl, {
+ headers: {
+ 'X-RapidAPI-Key': 'demo-key-placeholder',
+ 'X-RapidAPI-Host': 'exercisedb.p.rapidapi.com'
+ }
+ });
+ 
+ if (response.ok) {
+ const data = await response.json();
+ if (data && data.gifUrl) {
+ cache[cacheKey] = data.gifUrl;
+ save(KEYS.exerciseCache, cache);
+ return data.gifUrl;
+ }
+ }
+ } catch (e) {
+ console.log('ExerciseDB fetch failed, using fallback');
+ }
+
+ // Fallback: use emoji from exercise or default
+ const fallbackEmojis = {
+ 'supino': '🏋️', 'agachamento': '🦵', 'remada': '🚣', 'puxada': '🔽',
+ 'desenvolvimento': '🎯', 'elevação': '🦋', 'rosca': '💪', 'tríceps': '🔱',
+ 'abdominal': '🧘', 'prancha': '🧘', 'leg press': '🦿', 'stiff': '🏋️‍♀️',
+ 'flexão': '💪', 'barra fixa': '🏗️', 'panturrilha': '👟', 'encolhimento': '⬆️'
+ };
+ 
+ const lowerName = cacheKey;
+ let emoji = '🏋️';
+ for (const [key, val] of Object.entries(fallbackEmojis)) {
+ if (lowerName.includes(key)) { emoji = val; break; }
+ }
+ 
+ cache[cacheKey] = emoji;
+ save(KEYS.exerciseCache, cache);
+ return emoji;
+ }
+
+ // Preload animations for current day's exercises
+ async function preloadAnimations(exercises) {
+ if (!exercises) return;
+ const promises = exercises.map(ex => {
+ if (ex.animacao && ex.animacao.startsWith('http')) return Promise.resolve();
+ return fetchExerciseAnimation(ex.nome).then(url => {
+ if (url && url.startsWith('http')) ex.animacao = url;
+ });
+ });
+ await Promise.all(promises);
+ }
+
  // --- ONBOARDING CHECK ---
  if (!localStorage.getItem(KEYS.onboarding)) {
  window.location.href = 'anamnese.html';
@@ -28,10 +90,6 @@
  }
 
  // --- HYDRATION SCIENTIFIC CALCULATION ---
- // Based on EFSA/Institute of Medicine guidelines:
- // Base: 35ml per kg body weight for adults
- // Adjustments: +500ml per hour of exercise, +250ml per 5°C above 25°C ambient
- // Personal trainer can override via settings
  function calculateHydrationGoal() {
  const anamnese = load(KEYS.anamnese) || {};
  const settings = load(KEYS.personalSettings) || {};
@@ -41,7 +99,6 @@
  const peso = anamnese.peso || 70;
  let baseMl = Math.round(peso * 35);
  
- // Activity adjustment based on workout frequency
  const diasSemana = anamnese.diasSemana || 4;
  if (diasSemana >= 5) baseMl += 500;
  else if (diasSemana >= 3) baseMl += 250;
@@ -83,19 +140,25 @@
  const file = e.target.files[0];
  if (!file) return;
  const reader = new FileReader();
- reader.onload = (ev) => {
+ reader.onload = async (ev) => {
  try {
  const plan = JSON.parse(ev.target.result);
  if (!plan.dias || !Array.isArray(plan.dias)) throw new Error('Formato inválido');
  save(KEYS.workoutPlan, plan);
  
- // Extract personal settings if present in the file
  if (plan.configuracoesPersonal) {
  save(KEYS.personalSettings, plan.configuracoesPersonal);
  }
  
- uploadStatus.textContent = '✓ Ficha carregada com sucesso!';
+ uploadStatus.textContent = '✓ Ficha carregada! Buscando animações...';
  uploadStatus.style.color = 'var(--accent)';
+ 
+ // Preload animations for all exercises
+ const allExercises = plan.dias.flatMap(d => d.exercicios || []);
+ await preloadAnimations(allExercises);
+ save(KEYS.workoutPlan, plan);
+ 
+ uploadStatus.textContent = '✓ Ficha pronta com animações!';
  renderTodayWorkout();
  setTimeout(() => { uploadStatus.textContent = ''; }, 3000);
  } catch (err) {
@@ -107,7 +170,7 @@
  });
 
  // --- TODAY WORKOUT ---
- function renderTodayWorkout() {
+ async function renderTodayWorkout() {
  const plan = load(KEYS.workoutPlan);
  const container = document.getElementById('today-workout-container');
  const noMsg = document.getElementById('no-workout-msg');
@@ -142,16 +205,24 @@
  badgeEl.textContent = dayPlan.nome || ('Treino ' + dayName);
  badgeEl.className = 'workout-badge active';
 
+ // Ensure animations are loaded
+ await preloadAnimations(dayPlan.exercicios);
+
  const completed = load(KEYS.completedWorkouts) || {};
  const todayKey = todayStr();
  if (!completed[todayKey]) completed[todayKey] = [];
 
  listEl.innerHTML = dayPlan.exercicios.map((ex, i) => {
  const isDone = completed[todayKey].includes(i);
+ const isGif = ex.animacao && ex.animacao.startsWith('http');
+ const iconHtml = isGif 
+ ? `<img src="${escapeHtml(ex.animacao)}" alt="${escapeHtml(ex.nome)}" class="exercise-gif" loading="lazy" />`
+ : `<div class="exercise-icon">${ex.animacao || '🏋️'}</div>`;
+ 
  return `
  <div class="exercise-card ${isDone ? 'done' : ''}" data-index="${i}">
  <div class="exercise-card-header">
- <div class="exercise-icon">${ex.animacao || '🏋️'}</div>
+ ${iconHtml}
  <div class="exercise-title">
  <h3>${escapeHtml(ex.nome)}</h3>
  <p class="exercise-target">${escapeHtml(ex.grupoMuscular || '')}</p>
@@ -210,8 +281,6 @@
  document.getElementById('hydration-formula').textContent = getHydrationFormulaText();
  const pct = Math.min((ml / meta) * 100, 100);
  document.getElementById('hydration-fill').style.width = pct + '%';
-
- // Weight chart
  renderWeightChart();
  }
 
@@ -297,7 +366,6 @@
  const weekWeights = weights.filter(w => new Date(w.data) >= weekAgo);
  const weightChange = weekWeights.length >= 2 ? (weekWeights[weekWeights.length-1].peso - weekWeights[0].peso).toFixed(1) : '—';
 
- // Calculate available vs needed days
  const anamnese = load(KEYS.anamnese) || {};
  const settings = load(KEYS.personalSettings) || {};
  const diasNecessarios = settings.diasTreino || anamnese.diasSemana || 4;
@@ -309,7 +377,6 @@
  <div class="stat-box"><div class="stat-value">${weightChange !== '—' ? (weightChange > 0 ? '+' : '') + weightChange : '—'}</div><div class="stat-label">Variação peso (kg)</div></div>
  `;
 
- // Muscle groups trained this week
  renderMuscleChart(weekDates, completed, plan);
  renderStressChart(weekDates, completed, plan);
 
@@ -326,7 +393,6 @@
  return;
  }
 
- // Count muscle group frequency across the week
  const muscleCounts = {};
  weekDates.forEach(date => {
  if (!completed[date]) return;
@@ -381,9 +447,6 @@
  return;
  }
 
- // Calculate stress per muscle group based on volume and recovery time
- // Stress = (sets * reps * weight) / recovery_factor
- // Recovery factor: 48h for small muscles, 72h for large muscles
  const muscleStress = {};
  const largeMuscles = ['Peitoral', 'Dorsal', 'Quadríceps', 'Glúteos', 'Posterior'];
  
@@ -509,7 +572,6 @@
  ${anamnese.lesoes && anamnese.lesoes.length ? '<div class="profile-row"><strong>Limitações:</strong> ' + anamnese.lesoes.join(', ') + '</div>' : ''}
  `;
 
- // Personal settings display
  const settings = load(KEYS.personalSettings) || {};
  const settingsEl = document.getElementById('personal-settings-display');
  if (Object.keys(settings).length === 0) {
