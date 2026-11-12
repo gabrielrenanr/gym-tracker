@@ -96,15 +96,20 @@
  setTimeout(() => { window.location.href = 'index.html'; }, 1500);
  };
 
- // Selection styling for radio/checkbox items
- document.querySelectorAll('.radio-item, .checkbox-item').forEach(item => {
- item.addEventListener('click', () => {
- const input = item.querySelector('input');
+ // Selection styling for radio/checkbox items - use change event on inputs
+ document.querySelectorAll('.radio-item input, .checkbox-item input').forEach(input => {
+ input.addEventListener('change', () => {
  if (input.type === 'radio') {
- document.querySelectorAll(`input[name="${input.name}"]`).forEach(r => r.closest('.radio-item').classList.remove('selected'));
+ // Remove selected class from all radios in the same group
+ document.querySelectorAll(`input[name="${input.name}"]`).forEach(r => {
+ r.closest('.radio-item').classList.remove('selected');
+ });
  }
- input.checked = !input.checked;
+ // Toggle selected class on the parent item
+ const item = input.closest('.radio-item, .checkbox-item');
+ if (item) {
  item.classList.toggle('selected', input.checked);
+ }
  });
  });
 
