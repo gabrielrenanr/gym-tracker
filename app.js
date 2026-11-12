@@ -23,76 +23,11 @@
  }
  function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
- // --- EXERCISE ANIMATION FETCHER (wger.de API - free, no key) ---
- async function fetchExerciseAnimation(exerciseName) {
- const cache = load(KEYS.exerciseCache) || {};
- const cacheKey = exerciseName.toLowerCase().trim();
- 
- if (cache[cacheKey]) return cache[cacheKey];
-
- try {
- // Search wger.de API for exercise images
- const searchUrl = `https://wger.de/api/v2/exercise/search/?term=${encodeURIComponent(exerciseName)}&format=json&language=2`;
- const response = await fetch(searchUrl);
- 
- if (response.ok) {
- const data = await response.json();
- if (data.suggestions && data.suggestions.length > 0) {
- const exerciseId = data.suggestions[0].id;
- // Get exercise info with images
- const infoUrl = `https://wger.de/api/v2/exerciseinfo/${exerciseId}/?format=json`;
- const infoResponse = await fetch(infoUrl);
- if (infoResponse.ok) {
- const info = await infoResponse.json();
- if (info.images && info.images.length > 0) {
- const imageUrl = info.images[0].image;
- cache[cacheKey] = imageUrl;
- save(KEYS.exerciseCache, cache);
- return imageUrl;
- }
- }
- }
- }
- } catch (e) {
- console.log('wger fetch failed, trying fallback');
- }
-
- // Fallback: curated GIF URLs from public sources
- const curatedGifs = {
- 'supino reto': 'https://media.tenor.com/images/d4c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8/tenor.gif',
- 'agachamento': 'https://media.tenor.com/images/bench-press-squat.gif',
- 'remada': 'https://media.tenor.com/images/row.gif'
- };
-
- // Use emoji fallback with better mapping
- const fallbackEmojis = {
- 'supino': '🏋️', 'agachamento': '🦵', 'remada': '🚣', 'puxada': '🔽',
- 'desenvolvimento': '🎯', 'elevação': '🦋', 'rosca': '💪', 'tríceps': '🔱',
- 'abdominal': '🧘', 'prancha': '🧘', 'leg press': '🦿', 'stiff': '🏋️‍♀️',
- 'flexão': '💪', 'barra fixa': '🏗️', 'panturrilha': '👟', 'encolhimento': '⬆️',
- 'crucifixo': '🦅', 'pullover': '🔄', 'afundo': '🚶', 'terra': '🏋️'
- };
- 
- const lowerName = cacheKey;
- let emoji = '🏋️';
- for (const [key, val] of Object.entries(fallbackEmojis)) {
- if (lowerName.includes(key)) { emoji = val; break; }
- }
- 
- cache[cacheKey] = emoji;
- save(KEYS.exerciseCache, cache);
- return emoji;
- }
-
- async function preloadAnimations(exercises) {
- if (!exercises) return;
- const promises = exercises.map(ex => {
- if (ex.animacao && (ex.animacao.startsWith('http') || ex.animacao.startsWith('data:'))) return Promise.resolve();
- return fetchExerciseAnimation(ex.nome).then(url => {
- if (url && (url.startsWith('http') || url.startsWith('data:'))) ex.animacao = url;
- });
- });
- await Promise.all(promises);
+ // --- YOUTUBE VIDEO EMBED FOR EXERCISES ---
+ function getYouTubeEmbedUrl(exerciseName) {
+ // Use YouTube search embed - shows first result for the exercise
+ const searchQuery = encodeURIComponent(exerciseName + ' execução correta como fazer');
+ return `https://www.youtube.com/embed?listType=search&list=${searchQuery}`;
  }
 
  // --- ONBOARDING CHECK ---
@@ -152,7 +87,7 @@
  const file = e.target.files[0];
  if (!file) return;
  const reader = new FileReader();
- reader.onload = async (ev) => {
+ reader.onload = (ev) => {
  try {
  const plan = JSON.parse(ev.target.result);
  if (!plan.dias || !Array.isArray(plan.dias)) throw new Error('Formato inválido');
@@ -162,14 +97,8 @@
  save(KEYS.personalSettings, plan.configuracoesPersonal);
  }
  
- uploadStatus.textContent = '✓ Ficha carregada! Buscando animações...';
+ uploadStatus.textContent = '✓ Ficha carregada com sucesso!';
  uploadStatus.style.color = 'var(--accent)';
- 
- const allExercises = plan.dias.flatMap(d => d.exercicios || []);
- await preloadAnimations(allExercises);
- save(KEYS.workoutPlan, plan);
- 
- uploadStatus.textContent = '✓ Ficha pronta com animações!';
  renderTodayWorkout();
  setTimeout(() => { uploadStatus.textContent = ''; }, 3000);
  } catch (err) {
@@ -181,7 +110,7 @@
  });
 
  // --- TODAY WORKOUT ---
- async function renderTodayWorkout() {
+ function renderTodayWorkout() {
  const plan = load(KEYS.workoutPlan);
  const container = document.getElementById('today-workout-container');
  const noMsg = document.getElementById('no-workout-msg');
@@ -216,8 +145,6 @@
  badgeEl.textContent = dayPlan.nome || ('Treino ' + dayName);
  badgeEl.className = 'workout-badge active';
 
- await preloadAnimations(dayPlan.exercicios);
-
  const completed = load(KEYS.completedWorkouts) || {};
  const realizedWeights = load(KEYS.realizedWeights) || {};
  const todayKey = todayStr();
@@ -225,18 +152,28 @@
 
  listEl.innerHTML = dayPlan.exercicios.map((ex, i) => {
  const isDone = completed[todayKey].includes(i);
- const isGif = ex.animacao && (ex.animacao.startsWith('http') || ex.animacao.startsWith('data:'));
- const iconHtml = isGif 
- ? `<img src="${escapeHtml(ex.animacao)}" alt="${escapeHtml(ex.nome)}" class="exercise-gif" loading="lazy" />`
- : `<div class="exercise-icon">${ex.animacao || '🏋️'}</div>`;
+ const videoUrl = getYouTubeEmbedUrl(ex.nome);
  
  const realizedKey = `${todayKey}_${i}`;
  const realizedWeight = realizedWeights[realizedKey] || '';
  
  return `
  <div class="exercise-card ${isDone ? 'done' : ''}" data-index="${i}">
+ <div class="exercise-video-section">
+ <button class="btn-show-video" onclick="toggleVideo(${i})">
+ 📹 Ver vídeo de execução
+ </button>
+ <div class="video-container" id="video-${i}" style="display:none;">
+ <iframe 
+ src="${videoUrl}" 
+ frameborder="0" 
+ allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+ allowfullscreen
+ loading="lazy">
+ </iframe>
+ </div>
+ </div>
  <div class="exercise-card-header">
- ${iconHtml}
  <div class="exercise-title">
  <h3>${escapeHtml(ex.nome)}</h3>
  <p class="exercise-target">${escapeHtml(ex.grupoMuscular || '')}</p>
@@ -261,6 +198,15 @@
  `;
  }).join('');
  }
+
+ window.toggleVideo = function(index) {
+ const videoContainer = document.getElementById(`video-${index}`);
+ if (videoContainer.style.display === 'none') {
+ videoContainer.style.display = 'block';
+ } else {
+ videoContainer.style.display = 'none';
+ }
+ };
 
  window.toggleExercise = function(index) {
  const completed = load(KEYS.completedWorkouts) || {};
@@ -513,8 +459,6 @@
  return;
  }
 
- // Use absolute thresholds instead of relative
- // Low stress: < 50, Medium: 50-100, High: > 100
  const maxStress = Math.max(...entries.map(e => e[1]), 100);
  const barHeight = 28;
  const gap = 10;
@@ -526,7 +470,6 @@
  const y = i * (barHeight + gap) + 10;
  const barW = Math.max((stress / maxStress) * (chartWidth - labelWidth - 50), 10);
  
- // Color based on absolute thresholds
  let color = 'var(--accent)';
  let zone = 'Baixo';
  if (stress > 100) {
@@ -544,7 +487,6 @@
  `;
  }).join('');
 
- // Add legend
  const legend = `
  <g transform="translate(${labelWidth}, ${height - 25})">
  <rect x="0" y="0" width="12" height="12" rx="2" fill="var(--accent)" opacity="0.85"/>
@@ -578,7 +520,6 @@
  weekDates.push(d.toISOString().slice(0, 10));
  }
 
- // Collect realized weights for the week
  const realizedWeightsWeek = {};
  weekDates.forEach(date => {
  const dayCompleted = completed[date] || [];

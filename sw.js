@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gymtracker-v6';
+const CACHE_NAME = 'gymtracker-v7';
 const ASSETS_TO_CACHE = [
  './',
  './index.html',
@@ -33,6 +33,7 @@ self.addEventListener('fetch', (event) => {
  caches.match(event.request).then((cached) => cached || fetch(event.request))
  );
 });
+
 
 
 
