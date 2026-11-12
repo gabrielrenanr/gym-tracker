@@ -8,7 +8,8 @@
  hydration: 'gym_hydration',
  weightLog: 'gym_weight_log',
  weeklyNotes: 'gym_weekly_notes',
- completedWorkouts: 'gym_completed_workouts'
+ completedWorkouts: 'gym_completed_workouts',
+ personalSettings: 'gym_personal_settings'
  };
 
  function load(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
@@ -26,6 +27,39 @@
  return;
  }
 
+ // --- HYDRATION SCIENTIFIC CALCULATION ---
+ // Based on EFSA/Institute of Medicine guidelines:
+ // Base: 35ml per kg body weight for adults
+ // Adjustments: +500ml per hour of exercise, +250ml per 5°C above 25°C ambient
+ // Personal trainer can override via settings
+ function calculateHydrationGoal() {
+ const anamnese = load(KEYS.anamnese) || {};
+ const settings = load(KEYS.personalSettings) || {};
+ 
+ if (settings.hidratacaoMl) return settings.hidratacaoMl;
+ 
+ const peso = anamnese.peso || 70;
+ let baseMl = Math.round(peso * 35);
+ 
+ // Activity adjustment based on workout frequency
+ const diasSemana = anamnese.diasSemana || 4;
+ if (diasSemana >= 5) baseMl += 500;
+ else if (diasSemana >= 3) baseMl += 250;
+ 
+ return Math.max(1500, Math.min(baseMl, 5000));
+ }
+
+ function getHydrationFormulaText() {
+ const anamnese = load(KEYS.anamnese) || {};
+ const settings = load(KEYS.personalSettings) || {};
+ const peso = anamnese.peso || 70;
+ 
+ if (settings.hidratacaoMl) {
+ return `Meta definida pelo personal: ${settings.hidratacaoMl} ml/dia`;
+ }
+ return `Fórmula: ${peso}kg × 35ml = ${Math.round(peso * 35)}ml + ajuste por atividade (${anamnese.diasSemana || 4} dias/semana)`;
+ }
+
  // --- TAB NAVIGATION ---
  const tabs = document.querySelectorAll('.tab');
  const contents = document.querySelectorAll('.tab-content');
@@ -36,7 +70,7 @@
  tab.classList.add('active');
  document.getElementById(tab.dataset.tab).classList.add('active');
  if (tab.dataset.tab === 'hidratacao') renderHydration();
- if (tab.dataset.tab === 'relatorio') renderWeeklyStats();
+ if (tab.dataset.tab === 'relatorio') renderWeeklyReport();
  if (tab.dataset.tab === 'perfil') renderProfile();
  });
  });
@@ -54,12 +88,18 @@
  const plan = JSON.parse(ev.target.result);
  if (!plan.dias || !Array.isArray(plan.dias)) throw new Error('Formato inválido');
  save(KEYS.workoutPlan, plan);
- uploadStatus.textContent = 'Ficha carregada com sucesso!';
+ 
+ // Extract personal settings if present in the file
+ if (plan.configuracoesPersonal) {
+ save(KEYS.personalSettings, plan.configuracoesPersonal);
+ }
+ 
+ uploadStatus.textContent = '✓ Ficha carregada com sucesso!';
  uploadStatus.style.color = 'var(--accent)';
  renderTodayWorkout();
  setTimeout(() => { uploadStatus.textContent = ''; }, 3000);
  } catch (err) {
- uploadStatus.textContent = 'Erro: arquivo inválido. Verifique o JSON.';
+ uploadStatus.textContent = '✗ Erro: arquivo inválido. Verifique o JSON.';
  uploadStatus.style.color = 'var(--danger)';
  }
  };
@@ -92,7 +132,7 @@
  d.dia.toLowerCase().includes(dayName.toLowerCase().substring(0,3))
  );
 
- if (!dayPlan) {
+ if (!dayPlan || !dayPlan.exercicios || dayPlan.exercicios.length === 0) {
  badgeEl.textContent = 'Descanso';
  badgeEl.className = 'workout-badge rest';
  listEl.innerHTML = '<div class="empty-state">Dia de descanso. Aproveite para recuperar!</div>';
@@ -148,37 +188,76 @@
  function getHydrationData() {
  const data = load(KEYS.hydration) || {};
  const today = todayStr();
- if (!data[today]) data[today] = { copos: 0, meta: 8 };
+ const goal = calculateHydrationGoal();
+ if (!data[today]) data[today] = { ml: 0, meta: goal };
+ else data[today].meta = goal;
  return { data, today };
  }
 
  window.addWater = function(delta) {
  const { data, today } = getHydrationData();
- data[today].copos = Math.max(0, Math.min(data[today].copos + delta, 20));
+ data[today].ml = Math.max(0, Math.min(data[today].ml + delta, 10000));
  save(KEYS.hydration, data);
  renderHydration();
  };
 
  function renderHydration() {
  const { data, today } = getHydrationData();
- const copos = data[today].copos;
+ const ml = data[today].ml;
  const meta = data[today].meta;
- document.getElementById('water-count').textContent = copos;
+ document.getElementById('water-count').textContent = ml;
  document.getElementById('water-goal').textContent = meta;
- const pct = Math.min((copos / meta) * 100, 100);
+ document.getElementById('hydration-formula').textContent = getHydrationFormulaText();
+ const pct = Math.min((ml / meta) * 100, 100);
  document.getElementById('hydration-fill').style.width = pct + '%';
 
- // Weight mini history
- const weights = load(KEYS.weightLog) || [];
- const recent = weights.slice(-7).reverse();
- const miniEl = document.getElementById('weight-history-mini');
- if (recent.length === 0) {
- miniEl.innerHTML = '<p class="hint">Nenhum peso registrado ainda.</p>';
- } else {
- miniEl.innerHTML = recent.map(w =>
- `<div class="weight-entry"><span>${new Date(w.data).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})}</span><strong>${w.peso} kg</strong></div>`
- ).join('');
+ // Weight chart
+ renderWeightChart();
  }
+
+ // --- WEIGHT CHART (SVG) ---
+ function renderWeightChart() {
+ const weights = load(KEYS.weightLog) || [];
+ const container = document.getElementById('weight-chart-container');
+ 
+ if (weights.length < 2) {
+ container.innerHTML = '<p class="hint">Registre pelo menos 2 pesos para ver o gráfico.</p>';
+ return;
+ }
+
+ const recent = weights.slice(-30);
+ const minW = Math.min(...recent.map(w => w.peso)) - 1;
+ const maxW = Math.max(...recent.map(w => w.peso)) + 1;
+ const range = maxW - minW || 1;
+ 
+ const width = 320;
+ const height = 180;
+ const padding = 30;
+ const chartW = width - padding * 2;
+ const chartH = height - padding * 2;
+
+ const points = recent.map((w, i) => {
+ const x = padding + (i / (recent.length - 1)) * chartW;
+ const y = padding + chartH - ((w.peso - minW) / range) * chartH;
+ return `${x},${y}`;
+ }).join(' ');
+
+ const svg = `
+ <svg viewBox="0 0 ${width} ${height}" class="chart-svg">
+ <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height-padding}" stroke="var(--border)" stroke-width="1"/>
+ <line x1="${padding}" y1="${height-padding}" x2="${width-padding}" y2="${height-padding}" stroke="var(--border)" stroke-width="1"/>
+ <polyline points="${points}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+ ${recent.map((w, i) => {
+ const x = padding + (i / (recent.length - 1)) * chartW;
+ const y = padding + chartH - ((w.peso - minW) / range) * chartH;
+ return `<circle cx="${x}" cy="${y}" r="3" fill="var(--accent)"/>`;
+ }).join('')}
+ <text x="${padding}" y="${padding - 8}" fill="var(--text-secondary)" font-size="10">${maxW.toFixed(1)}kg</text>
+ <text x="${padding}" y="${height - padding + 16}" fill="var(--text-secondary)" font-size="10">${minW.toFixed(1)}kg</text>
+ <text x="${width - padding}" y="${height - padding + 16}" fill="var(--text-secondary)" font-size="10" text-anchor="end">Hoje</text>
+ </svg>
+ `;
+ container.innerHTML = svg;
  }
 
  // --- WEIGHT LOG ---
@@ -198,10 +277,11 @@
  });
 
  // --- WEEKLY REPORT ---
- function renderWeeklyStats() {
+ function renderWeeklyReport() {
  const completed = load(KEYS.completedWorkouts) || {};
  const weights = load(KEYS.weightLog) || [];
  const hydration = load(KEYS.hydration) || {};
+ const plan = load(KEYS.workoutPlan) || {};
  const statsEl = document.getElementById('weekly-stats');
 
  const now = new Date();
@@ -213,19 +293,153 @@
 
  const workoutsThisWeek = weekDates.filter(d => completed[d] && completed[d].length > 0).length;
  const totalExercises = weekDates.reduce((sum, d) => sum + (completed[d] ? completed[d].length : 0), 0);
- const avgWater = weekDates.reduce((sum, d) => sum + (hydration[d] ? hydration[d].copos : 0), 0) / 7;
+ const avgWater = weekDates.reduce((sum, d) => sum + (hydration[d] ? hydration[d].ml : 0), 0) / 7;
  const weekWeights = weights.filter(w => new Date(w.data) >= weekAgo);
  const weightChange = weekWeights.length >= 2 ? (weekWeights[weekWeights.length-1].peso - weekWeights[0].peso).toFixed(1) : '—';
 
+ // Calculate available vs needed days
+ const anamnese = load(KEYS.anamnese) || {};
+ const settings = load(KEYS.personalSettings) || {};
+ const diasNecessarios = settings.diasTreino || anamnese.diasSemana || 4;
+
  statsEl.innerHTML = `
- <div class="stat-box"><div class="stat-value">${workoutsThisWeek}</div><div class="stat-label">Treinos na semana</div></div>
+ <div class="stat-box"><div class="stat-value">${workoutsThisWeek}/${diasNecessarios}</div><div class="stat-label">Treinos (real/nec)</div></div>
  <div class="stat-box"><div class="stat-value">${totalExercises}</div><div class="stat-label">Exercícios concluídos</div></div>
- <div class="stat-box"><div class="stat-value">${avgWater.toFixed(1)}</div><div class="stat-label">Média copos/dia</div></div>
+ <div class="stat-box"><div class="stat-value">${Math.round(avgWater)}</div><div class="stat-label">Média hidratação (ml)</div></div>
  <div class="stat-box"><div class="stat-value">${weightChange !== '—' ? (weightChange > 0 ? '+' : '') + weightChange : '—'}</div><div class="stat-label">Variação peso (kg)</div></div>
  `;
 
+ // Muscle groups trained this week
+ renderMuscleChart(weekDates, completed, plan);
+ renderStressChart(weekDates, completed, plan);
+
  const savedNotes = localStorage.getItem(KEYS.weeklyNotes) || '';
  document.getElementById('weekly-notes').value = savedNotes;
+ }
+
+ // --- MUSCLE CHART (SVG) ---
+ function renderMuscleChart(weekDates, completed, plan) {
+ const container = document.getElementById('muscle-chart-container');
+ 
+ if (!plan || !plan.dias) {
+ container.innerHTML = '<p class="hint">Carregue uma ficha de treino para ver os músculos.</p>';
+ return;
+ }
+
+ // Count muscle group frequency across the week
+ const muscleCounts = {};
+ weekDates.forEach(date => {
+ if (!completed[date]) return;
+ const dayName = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' });
+ const dayPlan = plan.dias.find(d => 
+ d.dia.toLowerCase() === dayName.toLowerCase() ||
+ d.dia.toLowerCase().includes(dayName.toLowerCase().substring(0,3))
+ );
+ if (!dayPlan || !dayPlan.exercicios) return;
+ 
+ completed[date].forEach(idx => {
+ const ex = dayPlan.exercicios[idx];
+ if (ex && ex.grupoMuscular) {
+ const group = ex.grupoMuscular.split('/')[0].trim();
+ muscleCounts[group] = (muscleCounts[group] || 0) + 1;
+ }
+ });
+ });
+
+ const entries = Object.entries(muscleCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
+ if (entries.length === 0) {
+ container.innerHTML = '<p class="hint">Nenhum músculo registrado esta semana.</p>';
+ return;
+ }
+
+ const maxCount = Math.max(...entries.map(e => e[1]));
+ const barHeight = 24;
+ const gap = 8;
+ const labelWidth = 120;
+ const chartWidth = 280;
+ const height = entries.length * (barHeight + gap) + 20;
+
+ const bars = entries.map(([name, count], i) => {
+ const y = i * (barHeight + gap) + 10;
+ const barW = (count / maxCount) * (chartWidth - labelWidth - 40);
+ return `
+ <text x="${labelWidth - 5}" y="${y + barHeight/2 + 4}" fill="var(--text-primary)" font-size="11" text-anchor="end">${escapeHtml(name.substring(0,18))}</text>
+ <rect x="${labelWidth}" y="${y}" width="${barW}" height="${barHeight}" rx="4" fill="var(--accent)" opacity="${0.4 + (count/maxCount)*0.6}"/>
+ <text x="${labelWidth + barW + 6}" y="${y + barHeight/2 + 4}" fill="var(--text-secondary)" font-size="11">${count}x</text>
+ `;
+ }).join('');
+
+ container.innerHTML = `<svg viewBox="0 0 ${chartWidth} ${height}" class="chart-svg">${bars}</svg>`;
+ }
+
+ // --- STRESS CHART (SVG) ---
+ function renderStressChart(weekDates, completed, plan) {
+ const container = document.getElementById('stress-chart-container');
+ 
+ if (!plan || !plan.dias) {
+ container.innerHTML = '<p class="hint">Carregue uma ficha de treino para ver o stress muscular.</p>';
+ return;
+ }
+
+ // Calculate stress per muscle group based on volume and recovery time
+ // Stress = (sets * reps * weight) / recovery_factor
+ // Recovery factor: 48h for small muscles, 72h for large muscles
+ const muscleStress = {};
+ const largeMuscles = ['Peitoral', 'Dorsal', 'Quadríceps', 'Glúteos', 'Posterior'];
+ 
+ weekDates.forEach(date => {
+ if (!completed[date]) return;
+ const dayName = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' });
+ const dayPlan = plan.dias.find(d => 
+ d.dia.toLowerCase() === dayName.toLowerCase() ||
+ d.dia.toLowerCase().includes(dayName.toLowerCase().substring(0,3))
+ );
+ if (!dayPlan || !dayPlan.exercicios) return;
+ 
+ completed[date].forEach(idx => {
+ const ex = dayPlan.exercicios[idx];
+ if (!ex || !ex.grupoMuscular) return;
+ 
+ const group = ex.grupoMuscular.split('/')[0].trim();
+ const sets = parseInt(ex.series) || 3;
+ const reps = parseInt(String(ex.repeticoes).split('-')[0]) || 10;
+ const weight = parseFloat(ex.cargaKg) || 0;
+ const volume = sets * reps * weight;
+ 
+ const isLarge = largeMuscles.some(m => group.includes(m));
+ const recoveryFactor = isLarge ? 72 : 48;
+ const stressScore = volume / recoveryFactor;
+ 
+ muscleStress[group] = (muscleStress[group] || 0) + stressScore;
+ });
+ });
+
+ const entries = Object.entries(muscleStress).sort((a,b) => b[1] - a[1]).slice(0, 8);
+ if (entries.length === 0) {
+ container.innerHTML = '<p class="hint">Nenhum dado de stress esta semana.</p>';
+ return;
+ }
+
+ const maxStress = Math.max(...entries.map(e => e[1]));
+ const barHeight = 24;
+ const gap = 8;
+ const labelWidth = 120;
+ const chartWidth = 280;
+ const height = entries.length * (barHeight + gap) + 20;
+
+ const bars = entries.map(([name, stress], i) => {
+ const y = i * (barHeight + gap) + 10;
+ const barW = (stress / maxStress) * (chartWidth - labelWidth - 40);
+ const intensity = stress / maxStress;
+ const color = intensity > 0.8 ? '#ff4d4d' : intensity > 0.5 ? '#ffa500' : 'var(--accent)';
+ return `
+ <text x="${labelWidth - 5}" y="${y + barHeight/2 + 4}" fill="var(--text-primary)" font-size="11" text-anchor="end">${escapeHtml(name.substring(0,18))}</text>
+ <rect x="${labelWidth}" y="${y}" width="${barW}" height="${barHeight}" rx="4" fill="${color}" opacity="0.8"/>
+ <text x="${labelWidth + barW + 6}" y="${y + barHeight/2 + 4}" fill="var(--text-secondary)" font-size="11">${Math.round(stress)}</text>
+ `;
+ }).join('');
+
+ container.innerHTML = `<svg viewBox="0 0 ${chartWidth} ${height}" class="chart-svg">${bars}</svg>`;
  }
 
  window.exportWeeklyReport = function() {
@@ -237,6 +451,7 @@
  const hydration = load(KEYS.hydration) || {};
  const anamnese = load(KEYS.anamnese) || {};
  const plan = load(KEYS.workoutPlan) || {};
+ const settings = load(KEYS.personalSettings) || {};
 
  const now = new Date();
  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -249,14 +464,17 @@
  tipo: 'relatorio_semanal',
  periodo: { inicio: weekDates[0], fim: weekDates[weekDates.length - 1] },
  geradoEm: new Date().toISOString(),
- usuario: { nome: anamneseData.nome || anamnese.nome, objetivo: anamnese.objetivo },
+ usuario: { nome: anamnese.nome, objetivos: anamnese.objetivos },
+ configuracoesPersonal: settings,
  resumo: {
  treinosRealizados: weekDates.filter(d => completed[d] && completed[d].length > 0).length,
+ diasNecessarios: settings.diasTreino || anamnese.diasSemana || 4,
  totalExerciciosConcluidos: weekDates.reduce((s, d) => s + (completed[d] ? completed[d].length : 0), 0),
- mediaHidratacao: +(weekDates.reduce((s, d) => s + (hydration[d] ? hydration[d].copos : 0), 0) / 7).toFixed(1)
+ mediaHidratacaoMl: Math.round(weekDates.reduce((s, d) => s + (hydration[d] ? hydration[d].ml : 0), 0) / 7),
+ metaHidratacaoMl: calculateHydrationGoal()
  },
  pesosSemana: weights.filter(w => new Date(w.data) >= weekAgo),
- hidratacaoDiaria: weekDates.map(d => ({ data: d, copos: hydration[d] ? hydration[d].copos : 0 })),
+ hidratacaoDiaria: weekDates.map(d => ({ data: d, ml: hydration[d] ? hydration[d].ml : 0 })),
  exerciciosPorDia: weekDates.map(d => ({ data: d, concluidos: completed[d] || [] })),
  observacoes: notes
  };
@@ -285,11 +503,25 @@
  <div class="profile-row"><strong>Idade:</strong> ${anamnese.idade} anos</div>
  <div class="profile-row"><strong>Peso:</strong> ${anamnese.peso} kg</div>
  <div class="profile-row"><strong>Altura:</strong> ${anamnese.altura} cm</div>
- <div class="profile-row"><strong>Objetivo:</strong> ${escapeHtml(anamnese.objetivo)}</div>
+ <div class="profile-row"><strong>Objetivos:</strong> ${(anamnese.objetivos || []).map(o => escapeHtml(o)).join(', ')}</div>
  <div class="profile-row"><strong>Experiência:</strong> ${escapeHtml(anamnese.experiencia)}</div>
  <div class="profile-row"><strong>Dias/semana:</strong> ${anamnese.diasSemana}</div>
  ${anamnese.lesoes && anamnese.lesoes.length ? '<div class="profile-row"><strong>Limitações:</strong> ' + anamnese.lesoes.join(', ') + '</div>' : ''}
  `;
+
+ // Personal settings display
+ const settings = load(KEYS.personalSettings) || {};
+ const settingsEl = document.getElementById('personal-settings-display');
+ if (Object.keys(settings).length === 0) {
+ settingsEl.innerHTML = '<p class="hint">Nenhuma configuração personalizada ainda. Seu personal pode ajustar via upload da ficha.</p>';
+ } else {
+ settingsEl.innerHTML = `
+ ${settings.hidratacaoMl ? `<div class="profile-row"><strong>Hidratação diária:</strong> ${settings.hidratacaoMl} ml</div>` : ''}
+ ${settings.diasTreino ? `<div class="profile-row"><strong>Dias de treino/semana:</strong> ${settings.diasTreino}</div>` : ''}
+ ${settings.metaPeso ? `<div class="profile-row"><strong>Meta de peso:</strong> ${settings.metaPeso} kg</div>` : ''}
+ ${settings.obs ? `<div class="profile-row"><strong>Obs. do personal:</strong> ${escapeHtml(settings.obs)}</div>` : ''}
+ `;
+ }
 
  const weights = load(KEYS.weightLog) || [];
  const completed = load(KEYS.completedWorkouts) || {};

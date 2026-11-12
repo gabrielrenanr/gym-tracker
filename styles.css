@@ -189,3 +189,7 @@ select {
  .btn-circle { background: #fafafa; }
 }
 
+
+/* Charts */
+.chart-container { margin-top: 16px; overflow-x: auto; }
+.chart-svg { width: 100%; height: auto; display: block; }

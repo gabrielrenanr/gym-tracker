@@ -57,14 +57,15 @@
  <section id="hidratacao" class="tab-content">
  <div class="card">
  <h2>Hidratação Diária</h2>
+ <p class="hint" id="hydration-formula"></p>
  <div class="hydration-display">
  <div class="hydration-counter">
  <span id="water-count">0</span>
- <small>/ <span id="water-goal">8</span> copos (250ml)</small>
+ <small>/ <span id="water-goal">0</span> ml</small>
  </div>
  <div class="hydration-controls">
- <button class="btn-circle" onclick="addWater(-1)">−</button>
- <button class="btn-circle primary" onclick="addWater(1)">+</button>
+ <button class="btn-circle" onclick="addWater(-250)">−250</button>
+ <button class="btn-circle primary" onclick="addWater(250)">+250</button>
  </div>
  </div>
  <div class="hydration-bar">
@@ -85,7 +86,7 @@
  </div>
  </div>
  </form>
- <div id="weight-history-mini" class="weight-history-mini"></div>
+ <div id="weight-chart-container" class="chart-container"></div>
  </div>
  </section>
 
@@ -94,6 +95,16 @@
  <div class="card">
  <h2>Resumo da Semana</h2>
  <div id="weekly-stats" class="summary-grid"></div>
+ </div>
+
+ <div class="card">
+ <h2>Músculos Treinados na Semana</h2>
+ <div id="muscle-chart-container" class="chart-container"></div>
+ </div>
+
+ <div class="card">
+ <h2>Nível de Stress Muscular</h2>
+ <div id="stress-chart-container" class="chart-container"></div>
  </div>
 
  <div class="card">
@@ -115,6 +126,13 @@
  <div id="profile-display"></div>
  <button class="btn-secondary" onclick="resetAnamnese()" style="margin-top:16px;width:100%;padding:12px;border:1px solid var(--danger);color:var(--danger);background:transparent;border-radius:12px;font-size:14px;cursor:pointer;">Refazer Anamnese</button>
  </div>
+
+ <div class="card">
+ <h2>Configurações do Personal</h2>
+ <p class="hint">Seu personal pode ajustar estes valores via upload de ficha</p>
+ <div id="personal-settings-display"></div>
+ </div>
+
  <div class="card">
  <h2>Estatísticas Gerais</h2>
  <div id="stats-display" class="stats-grid"></div>
