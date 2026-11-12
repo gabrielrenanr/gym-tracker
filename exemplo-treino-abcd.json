@@ -1,0 +1,71 @@
+{
+ "nome": "Treino ABCD - Hipertrofia",
+ "aluno": "Exemplo",
+ "objetivo": "hipertrofia",
+ "semanaInicio": "2026-11-12",
+ "dias": [
+ {
+ "dia": "Segunda",
+ "nome": "Treino A - Peito e Tríceps",
+ "exercicios": [
+ { "nome": "Supino Reto com Barra", "grupoMuscular": "Peitoral Maior", "series": 4, "repeticoes": "8-12", "cargaKg": 60, "descansoS": 90, "animacao": "🏋️", "alternativa": "Supino reto com halteres ou máquina peck deck", "obs": "Controle a descida em 3 segundos" },
+ { "nome": "Supino Inclinado com Halteres", "grupoMuscular": "Peitoral Superior", "series": 3, "repeticoes": "10-12", "cargaKg": 24, "descansoS": 60, "animacao": "💪", "alternativa": "Supino inclinado na máquina Smith", "obs": null },
+ { "nome": "Crucifixo na Polia", "grupoMuscular": "Peitoral Interno", "series": 3, "repeticoes": "12-15", "cargaKg": 15, "descansoS": 45, "animacao": "🦅", "alternativa": "Crucifixo com halteres no banco plano", "obs": "Mantenha os cotovelos levemente flexionados" },
+ { "nome": "Tríceps Testa com Barra W", "grupoMuscular": "Tríceps", "series": 3, "repeticoes": "10-12", "cargaKg": 30, "descansoS": 60, "animacao": "🔱", "alternativa": "Tríceps francês com corda na polia", "obs": null },
+ { "nome": "Tríceps Corda na Polia", "grupoMuscular": "Tríceps Lateral", "series": 3, "repeticoes": "12-15", "cargaKg": 20, "descansoS": 45, "animacao": "⬇️", "alternativa": "Tríceps pulley barra reta", "obs": "Abra as mãos no final do movimento" }
+ ]
+ },
+ {
+ "dia": "Terça",
+ "nome": "Treino B - Costas e Bíceps",
+ "exercicios": [
+ { "nome": "Puxada Frontal Aberta", "grupoMuscular": "Dorsais", "series": 4, "repeticoes": "10-12", "cargaKg": 55, "descansoS": 60, "animacao": "🔽", "alternativa": "Barra fixa assistida ou graviton", "obs": "Puxe com os cotovelos, não com as mãos" },
+ { "nome": "Remada Curvada com Barra", "grupoMuscular": "Dorsal / Romboides", "series": 3, "repeticoes": "8-12", "cargaKg": 50, "descansoS": 90, "animacao": "🚣", "alternativa": "Remada baixa na polia ou remada serrote", "obs": "Mantenha a coluna neutra" },
+ { "nome": "Remada Unilateral com Halter", "grupoMuscular": "Dorsal Inferior", "series": 3, "repeticoes": "10-12", "cargaKg": 28, "descansoS": 60, "animacao": "🏗️", "alternativa": "Remada na máquina articulada", "obs": null },
+ { "nome": "Rosca Direta com Barra W", "grupoMuscular": "Bíceps", "series": 3, "repeticoes": "10-12", "cargaKg": 25, "descansoS": 60, "animacao": "💪", "alternativa": "Rosca alternada com halteres", "obs": "Não balance o tronco" },
+ { "nome": "Rosca Martelo com Halteres", "grupoMuscular": "Braquial / Braquiorradial", "series": 3, "repeticoes": "12-15", "cargaKg": 14, "descansoS": 45, "animacao": "🔨", "alternativa": "Rosca martelo na polia baixa", "obs": null }
+ ]
+ },
+ {
+ "dia": "Quarta",
+ "nome": "Descanso Ativo",
+ "exercicios": []
+ },
+ {
+ "dia": "Quinta",
+ "nome": "Treino C - Ombros e Trapézio",
+ "exercicios": [
+ { "nome": "Desenvolvimento Militar com Halteres", "grupoMuscular": "Deltoide Anterior/Médio", "series": 4, "repeticoes": "8-12", "cargaKg": 20, "descansoS": 90, "animacao": "🎯", "alternativa": "Desenvolvimento na máquina Smith", "obs": "Não trave os cotovelos no topo" },
+ { "nome": "Elevação Lateral com Halteres", "grupoMuscular": "Deltoide Lateral", "series": 4, "repeticoes": "12-15", "cargaKg": 10, "descansoS": 45, "animacao": "🦋", "alternativa": "Elevação lateral na polia", "obs": "Leve os cotovelos ligeiramente à frente" },
+ { "nome": "Elevação Posterior (Voador Invertido)", "grupoMuscular": "Deltoide Posterior", "series": 3, "repeticoes": "12-15", "cargaKg": 8, "descansoS": 45, "animacao": "🔄", "alternativa": "Crucifixo invertido com halteres", "obs": null },
+ { "nome": "Encolhimento com Halteres", "grupoMuscular": "Trapézio Superior", "series": 4, "repeticoes": "15-20", "cargaKg": 30, "descansoS": 45, "animacao": "⬆️", "alternativa": "Encolhimento com barra ou na máquina", "obs": "Segure 1 segundo no topo" },
+ { "nome": "Face Pull na Polia", "grupoMuscular": "Trapézio Médio / Deltoide Post.", "series": 3, "repeticoes": "15-20", "cargaKg": 15, "descansoS": 45, "animacao": "🧲", "alternativa": "Band pull-apart com elástico", "obs": "Importante para saúde do ombro" }
+ ]
+ },
+ {
+ "dia": "Sexta",
+ "nome": "Treino D - Pernas Completo",
+ "exercicios": [
+ { "nome": "Agachamento Livre com Barra", "grupoMuscular": "Quadríceps / Glúteos", "series": 4, "repeticoes": "8-12", "cargaKg": 80, "descansoS": 120, "animacao": "🦵", "alternativa": "Leg press 45° ou agachamento no Smith", "obs": "Desça até a coxa ficar paralela ao chão" },
+ { "nome": "Leg Press 45°", "grupoMuscular": "Quadríceps", "series": 3, "repeticoes": "12-15", "cargaKg": 160, "descansoS": 90, "animacao": "🦿", "alternativa": "Extensora + hack squat", "obs": "Não trave os joelhos na extensão" },
+ { "nome": "Stiff com Barra", "grupoMuscular": "Posterior de Coxa / Glúteos", "series": 3, "repeticoes": "10-12", "cargaKg": 60, "descansoS": 90, "animacao": "🏋️‍♀️", "alternativa": "Mesa flexora ou stiff com halteres", "obs": "Mantenha leve flexão nos joelhos" },
+ { "nome": "Cadeira Extensora", "grupoMuscular": "Quadríceps (isolado)", "series": 3, "repeticoes": "12-15", "cargaKg": 40, "descansoS": 60, "animacao": "🦶", "alternativa": "Afundo com halteres", "obs": "Segure 1 segundo na contração máxima" },
+ { "nome": "Panturrilha em Pé na Máquina", "grupoMuscular": "Gastrocnêmio", "series": 4, "repeticoes": "15-20", "cargaKg": 100, "descansoS": 45, "animacao": "👟", "alternativa": "Panturrilha no leg press ou unilateral com halter", "obs": "Amplitude total: desça bem e suba na ponta do pé" }
+ ]
+ },
+ {
+ "dia": "Sábado",
+ "nome": "Cardio + Core",
+ "exercicios": [
+ { "nome": "Esteira HIIT", "grupoMuscular": "Cardiovascular", "series": 1, "repeticoes": "20 min", "cargaKg": null, "descansoS": 0, "animacao": "🏃", "alternativa": "Bicicleta ergométrica ou elíptico", "obs": "1 min forte / 1 min moderado" },
+ { "nome": "Prancha Frontal", "grupoMuscular": "Core / Abdômen", "series": 3, "repeticoes": "45s", "cargaKg": null, "descansoS": 30, "animacao": "🧘", "alternativa": "Prancha lateral ou dead bug", "obs": "Mantenha o quadril alinhado" },
+ { "nome": "Abdominal Infra na Barra", "grupoMuscular": "Abdômen Inferior", "series": 3, "repeticoes": "12-15", "cargaKg": null, "descansoS": 45, "animacao": "🔄", "alternativa": "Elevação de pernas no chão ou canivete", "obs": null }
+ ]
+ },
+ {
+ "dia": "Domingo",
+ "nome": "Descanso Total",
+ "exercicios": []
+ }
+ ]
+}

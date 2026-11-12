@@ -1,117 +1,137 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="GymTracker" />
-  <meta name="theme-color" content="#1a1a1a" />
-  <meta name="description" content="Acompanhe seus treinos, histórico e progresso na academia." />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
-  <title>GymTracker</title>
-  <link rel="stylesheet" href="styles.css" />
+ <meta charset="UTF-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+ <meta name="apple-mobile-web-app-capable" content="yes" />
+ <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+ <meta name="apple-mobile-web-app-title" content="GymTracker" />
+ <meta name="theme-color" content="#1a1a1a" />
+ <meta name="description" content="Acompanhe seus treinos, hidratação, peso e relatórios semanais." />
+ <link rel="manifest" href="manifest.json" />
+ <link rel="apple-touch-icon" href="icon-192.png" />
+ <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+ <title>GymTracker</title>
+ <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div id="app">
-    <header class="app-header">
-      <h1>GymTracker</h1>
-      <p class="subtitle">Seu progresso, todos os dias</p>
-    </header>
+ <div id="app">
+ <header class="app-header">
+ <h1>GymTracker</h1>
+ <p class="subtitle">Seu personal trainer digital</p>
+ </header>
 
-    <nav class="tab-bar">
-      <button class="tab active" data-tab="treino">Treino</button>
-      <button class="tab" data-tab="historico">Histórico</button>
-      <button class="tab" data-tab="perfil">Perfil</button>
-    </nav>
+ <nav class="tab-bar">
+ <button class="tab active" data-tab="treino-dia">Treino</button>
+ <button class="tab" data-tab="hidratacao">Saúde</button>
+ <button class="tab" data-tab="relatorio">Relatório</button>
+ <button class="tab" data-tab="perfil">Perfil</button>
+ </nav>
 
-    <main id="main-content">
-      <!-- Treino Tab -->
-      <section id="treino" class="tab-content active">
-        <div class="card">
-          <h2>Treino de Hoje</h2>
-          <form id="exercise-form">
-            <label for="exercise-name">Exercício</label>
-            <input type="text" id="exercise-name" placeholder="Ex: Supino reto" required />
+ <main id="main-content">
+ <!-- TREINO DO DIA -->
+ <section id="treino-dia" class="tab-content active">
+ <div class="card upload-card">
+ <h2>Ficha de Treino</h2>
+ <p class="hint">Faça upload do JSON gerado pelo seu personal trainer</p>
+ <input type="file" id="workout-upload" accept=".json" />
+ <div id="upload-status" class="upload-status"></div>
+ </div>
 
-            <div class="row">
-              <div class="field">
-                <label for="sets">Séries</label>
-                <input type="number" id="sets" min="1" placeholder="3" required />
-              </div>
-              <div class="field">
-                <label for="reps">Repetições</label>
-                <input type="number" id="reps" min="1" placeholder="12" required />
-              </div>
-              <div class="field">
-                <label for="weight">Peso (kg)</label>
-                <input type="number" id="weight" min="0" step="0.5" placeholder="60" />
-              </div>
-            </div>
+ <div id="today-workout-container">
+ <div class="card">
+ <div class="day-header">
+ <h2 id="today-day-name">Carregando...</h2>
+ <span id="today-workout-label" class="workout-badge"></span>
+ </div>
+ <div id="exercise-cards-list"></div>
+ </div>
+ </div>
 
-            <button type="submit" class="btn-primary">Adicionar Exercício</button>
-          </form>
-        </div>
+ <div id="no-workout-msg" class="card empty-state" style="display:none;">
+ Nenhuma ficha de treino carregada ainda.<br/>Envie o arquivo JSON do seu personal.
+ </div>
+ </section>
 
-        <div class="card">
-          <h2>Exercícios Adicionados</h2>
-          <ul id="exercise-list" class="exercise-list"></ul>
-        </div>
-      </section>
+ <!-- HIDRATAÇÃO E PESO -->
+ <section id="hidratacao" class="tab-content">
+ <div class="card">
+ <h2>Hidratação Diária</h2>
+ <div class="hydration-display">
+ <div class="hydration-counter">
+ <span id="water-count">0</span>
+ <small>/ <span id="water-goal">8</span> copos (250ml)</small>
+ </div>
+ <div class="hydration-controls">
+ <button class="btn-circle" onclick="addWater(-1)">−</button>
+ <button class="btn-circle primary" onclick="addWater(1)">+</button>
+ </div>
+ </div>
+ <div class="hydration-bar">
+ <div id="hydration-fill" class="hydration-fill" style="width:0%"></div>
+ </div>
+ </div>
 
-      <!-- Histórico Tab -->
-      <section id="historico" class="tab-content">
-        <div class="card">
-          <h2>Histórico Semanal</h2>
-          <div id="weekly-summary" class="summary-grid"></div>
-        </div>
-        <div class="card">
-          <h2>Treinos Anteriores</h2>
-          <ul id="history-list" class="history-list"></ul>
-        </div>
-      </section>
+ <div class="card">
+ <h2>Peso Corporal</h2>
+ <form id="weight-form">
+ <div class="row">
+ <div class="field" style="flex:1">
+ <label for="daily-weight">Peso hoje (kg)</label>
+ <input type="number" id="daily-weight" min="30" max="300" step="0.1" placeholder="70.0" required />
+ </div>
+ <div class="field" style="align-self:flex-end;flex:1">
+ <button type="submit" class="btn-primary" style="margin-top:0">Registrar</button>
+ </div>
+ </div>
+ </form>
+ <div id="weight-history-mini" class="weight-history-mini"></div>
+ </div>
+ </section>
 
-      <!-- Perfil Tab -->
-      <section id="perfil" class="tab-content">
-        <div class="card">
-          <h2>Seus Dados</h2>
-          <form id="profile-form">
-            <label for="user-name">Nome</label>
-            <input type="text" id="user-name" placeholder="Seu nome" />
+ <!-- RELATÓRIO SEMANAL -->
+ <section id="relatorio" class="tab-content">
+ <div class="card">
+ <h2>Resumo da Semana</h2>
+ <div id="weekly-stats" class="summary-grid"></div>
+ </div>
 
-            <label for="user-weight">Peso atual (kg)</label>
-            <input type="number" id="user-weight" min="0" step="0.1" placeholder="70.0" />
+ <div class="card">
+ <h2>Observações da Semana</h2>
+ <textarea id="weekly-notes" rows="4" placeholder="Dores, máquinas ocupadas, exercícios substituídos, como se sentiu..." style="width:100%;padding:12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-size:16px;resize:vertical;font-family:inherit;"></textarea>
+ </div>
 
-            <label for="user-goal">Objetivo</label>
-            <select id="user-goal">
-              <option value="hipertrofia">Hipertrofia</option>
-              <option value="forca">Força</option>
-              <option value="emagrecimento">Emagrecimento</option>
-              <option value="condicionamento">Condicionamento</option>
-            </select>
+ <div class="card">
+ <h2>Exportar Relatório</h2>
+ <p class="hint">Envie para seu personal trainer analisar e ajustar o treino</p>
+ <button class="btn-primary" onclick="exportWeeklyReport()">Exportar Relatório Semanal (JSON)</button>
+ </div>
+ </section>
 
-            <button type="submit" class="btn-primary">Salvar Perfil</button>
-          </form>
-        </div>
-        <div class="card">
-          <h2>Estatísticas</h2>
-          <div id="stats-display" class="stats-grid"></div>
-        </div>
-      </section>
-    </main>
-  </div>
+ <!-- PERFIL -->
+ <section id="perfil" class="tab-content">
+ <div class="card">
+ <h2>Seus Dados</h2>
+ <div id="profile-display"></div>
+ <button class="btn-secondary" onclick="resetAnamnese()" style="margin-top:16px;width:100%;padding:12px;border:1px solid var(--danger);color:var(--danger);background:transparent;border-radius:12px;font-size:14px;cursor:pointer;">Refazer Anamnese</button>
+ </div>
+ <div class="card">
+ <h2>Estatísticas Gerais</h2>
+ <div id="stats-display" class="stats-grid"></div>
+ </div>
+ </section>
+ </main>
+ </div>
 
-  <script src="app.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(() => console.log('SW registered'))
-          .catch(err => console.log('SW failed:', err));
-      });
-    }
-  </script>
+ <script src="app.js"></script>
+ <script>
+ if ('serviceWorker' in navigator) {
+ window.addEventListener('load', () => {
+ navigator.serviceWorker.register('./sw.js')
+ .then(() => console.log('SW registered'))
+ .catch(err => console.log('SW failed:', err));
+ });
+ }
+ </script>
 </body>
 </html>

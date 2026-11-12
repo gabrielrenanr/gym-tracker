@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+ <meta charset="UTF-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+ <meta name="apple-mobile-web-app-capable" content="yes" />
+ <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+ <meta name="apple-mobile-web-app-title" content="GymTracker" />
+ <meta name="theme-color" content="#1a1a1a" />
+ <meta name="description" content="Anamnese inicial para personalização do seu treino." />
+ <link rel="manifest" href="manifest.json" />
+ <link rel="apple-touch-icon" href="icon-192.png" />
+ <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+ <title>GymTracker - Anamnese</title>
+ <link rel="stylesheet" href="styles.css" />
+ <style>
+ .step-indicator {
+ display: flex;
+ gap: 8px;
+ justify-content: center;
+ margin-bottom: 24px;
+ }
+ .step-dot {
+ width: 10px;
+ height: 10px;
+ border-radius: 50%;
+ background: var(--border);
+ transition: all 0.3s;
+ }
+ .step-dot.active {
+ background: var(--accent);
+ width: 32px;
+ border-radius: 5px;
+ }
+ .step-dot.done {
+ background: var(--accent);
+ opacity: 0.5;
+ }
+ .step-content {
+ display: none;
+ animation: fadeIn 0.3s ease;
+ }
+ .step-content.active {
+ display: block;
+ }
+ .btn-row {
+ display: flex;
+ gap: 12px;
+ margin-top: 24px;
+ }
+ .btn-secondary {
+ flex: 1;
+ padding: 14px;
+ background: transparent;
+ color: var(--text-primary);
+ border: 1px solid var(--border);
+ border-radius: 12px;
+ font-size: 16px;
+ font-weight: 600;
+ cursor: pointer;
+ }
+ .btn-primary {
+ flex: 1;
+ }
+ .checkbox-group, .radio-group {
+ display: flex;
+ flex-direction: column;
+ gap: 10px;
+ margin-top: 12px;
+ }
+ .checkbox-item, .radio-item {
+ display: flex;
+ align-items: center;
+ gap: 12px;
+ padding: 14px;
+ background: var(--bg-primary);
+ border: 1px solid var(--border);
+ border-radius: 10px;
+ cursor: pointer;
+ transition: all 0.2s;
+ }
+ .checkbox-item.selected, .radio-item.selected {
+ border-color: var(--accent);
+ background: rgba(200, 230, 50, 0.1);
+ }
+ .checkbox-item input, .radio-item input {
+ width: 20px;
+ height: 20px;
+ accent-color: var(--accent);
+ }
+ .progress-bar {
+ width: 100%;
+ height: 6px;
+ background: var(--border);
+ border-radius: 3px;
+ margin-bottom: 24px;
+ overflow: hidden;
+ }
+ .progress-fill {
+ height: 100%;
+ background: var(--accent);
+ border-radius: 3px;
+ transition: width 0.4s ease;
+ }
+ </style>
+</head>
+<body>
+ <div id="app">
+ <header class="app-header">
+ <h1>Seu Perfil</h1>
+ <p class="subtitle">Vamos personalizar seu treino</p>
+ </header>
+
+ <div class="progress-bar">
+ <div class="progress-fill" id="progress-fill" style="width: 16.6%"></div>
+ </div>
+
+ <div class="step-indicator" id="step-indicator">
+ <div class="step-dot active" data-step="1"></div>
+ <div class="step-dot" data-step="2"></div>
+ <div class="step-dot" data-step="3"></div>
+ <div class="step-dot" data-step="4"></div>
+ <div class="step-dot" data-step="5"></div>
+ <div class="step-dot" data-step="6"></div>
+ </div>
+
+ <main id="main-content">
+ <!-- Step 1: Dados Pessoais -->
+ <section class="step-content active" data-step="1">
+ <div class="card">
+ <h2>Dados Pessoais</h2>
+ <form id="step1-form">
+ <label for="anam-nome">Nome completo</label>
+ <input type="text" id="anam-nome" placeholder="Seu nome" required />
+
+ <label for="anam-idade">Idade</label>
+ <input type="number" id="anam-idade" min="14" max="90" placeholder="25" required />
+
+ <label for="anam-sexo">Sexo biológico</label>
+ <select id="anam-sexo" required>
+ <option value="">Selecione</option>
+ <option value="masculino">Masculino</option>
+ <option value="feminino">Feminino</option>
+ </select>
+
+ <label for="anam-altura">Altura (cm)</label>
+ <input type="number" id="anam-altura" min="140" max="220" placeholder="175" required />
+
+ <label for="anam-peso">Peso atual (kg)</label>
+ <input type="number" id="anam-peso" min="40" max="200" step="0.1" placeholder="70.0" required />
+ </form>
+ </div>
+ <div class="btn-row">
+ <button type="button" class="btn-primary" onclick="nextStep()">Próximo</button>
+ </div>
+ </section>
+
+ <!-- Step 2: Objetivos -->
+ <section class="step-content" data-step="2">
+ <div class="card">
+ <h2>Qual seu objetivo principal?</h2>
+ <div class="radio-group" id="objetivo-group">
+ <label class="radio-item" data-value="hipertrofia">
+ <input type="radio" name="objetivo" value="hipertrofia" />
+ <div><strong>Hipertrofia</strong><br /><small>Ganhar massa muscular</small></div>
+ </label>
+ <label class="radio-item" data-value="forca">
+ <input type="radio" name="objetivo" value="forca" />
+ <div><strong>Força</strong><br /><small>Aumentar carga máxima</small></div>
+ </label>
+ <label class="radio-item" data-value="emagrecimento">
+ <input type="radio" name="objetivo" value="emagrecimento" />
+ <div><strong>Emagrecimento</strong><br /><small>Perder gordura corporal</small></div>
+ </label>
+ <label class="radio-item" data-value="condicionamento">
+ <input type="radio" name="objetivo" value="condicionamento" />
+ <div><strong>Condicionamento</strong><br /><small>Resistência e fôlego</small></div>
+ </label>
+ <label class="radio-item" data-value="flexibilidade">
+ <input type="radio" name="objetivo" value="flexibilidade" />
+ <div><strong>Flexibilidade</strong><br /><small>Mobilidade e postura</small></div>
+ </label>
+ <label class="radio-item" data-value="saude">
+ <input type="radio" name="objetivo" value="saude" />
+ <div><strong>Saúde geral</strong><br /><small>Qualidade de vida</small></div>
+ </label>
+ </div>
+ </div>
+ <div class="btn-row">
+ <button type="button" class="btn-secondary" onclick="prevStep()">Voltar</button>
+ <button type="button" class="btn-primary" onclick="nextStep()">Próximo</button>
+ </div>
+ </section>
+
+ <!-- Step 3: Experiência -->
+ <section class="step-content" data-step="3">
+ <div class="card">
+ <h2>Nível de experiência</h2>
+ <div class="radio-group" id="experiencia-group">
+ <label class="radio-item" data-value="iniciante">
+ <input type="radio" name="experiencia" value="iniciante" />
+ <div><strong>Iniciante</strong><br /><small>Nunca treinei ou parei há mais de 1 ano</small></div>
+ </label>
+ <label class="radio-item" data-value="intermediario">
+ <input type="radio" name="experiencia" value="intermediario" />
+ <div><strong>Intermediário</strong><br /><small>Treino há 6 meses - 2 anos</small></div>
+ </label>
+ <label class="radio-item" data-value="avancado">
+ <input type="radio" name="experiencia" value="avancado" />
+ <div><strong>Avançado</strong><br /><small>Treino consistentemente há mais de 2 anos</small></div>
+ </label>
+ </div>
+ </div>
+
+ <div class="card">
+ <h2>Disponibilidade semanal</h2>
+ <div class="radio-group" id="dias-group">
+ <label class="radio-item" data-value="2">
+ <input type="radio" name="dias" value="2" />
+ <div><strong>2 dias por semana</strong></div>
+ </label>
+ <label class="radio-item" data-value="3">
+ <input type="radio" name="dias" value="3" />
+ <div><strong>3 dias por semana</strong></div>
+ </label>
+ <label class="radio-item" data-value="4">
+ <input type="radio" name="dias" value="4" />
+ <div><strong>4 dias por semana</strong></div>
+ </label>
+ <label class="radio-item" data-value="5">
+ <input type="radio" name="dias" value="5" />
+ <div><strong>5 dias por semana</strong></div>
+ </label>
+ <label class="radio-item" data-value="6">
+ <input type="radio" name="dias" value="6" />
+ <div><strong>6 dias por semana</strong></div>
+ </label>
+ </div>
+ </div>
+ <div class="btn-row">
+ <button type="button" class="btn-secondary" onclick="prevStep()">Voltar</button>
+ <button type="button" class="btn-primary" onclick="nextStep()">Próximo</button>
+ </div>
+ </section>
+
+ <!-- Step 4: Histórico Médico -->
+ <section class="step-content" data-step="4">
+ <div class="card">
+ <h2>Histórico de lesões ou limitações</h2>
+ <div class="checkbox-group" id="lesoes-group">
+ <label class="checkbox-item" data-value="joelho">
+ <input type="checkbox" name="lesoes" value="joelho" />
+ <div>Problemas no joelho</div>
+ </label>
+ <label class="checkbox-item" data-value="ombro">
+ <input type="checkbox" name="lesoes" value="ombro" />
+ <div>Problemas no ombro</div>
+ </label>
+ <label class="checkbox-item" data-value="coluna">
+ <input type="checkbox" name="lesoes" value="coluna" />
+ <div>Problemas na coluna (lombar/cervical)</div>
+ </label>
+ <label class="checkbox-item" data-value="punho">
+ <input type="checkbox" name="lesoes" value="punho" />
+ <div>Problemas no punho/mão</div>
+ </label>
+ <label class="checkbox-item" data-value="tornozelo">
+ <input type="checkbox" name="lesoes" value="tornozelo" />
+ <div>Problemas no tornozelo/pé</div>
+ </label>
+ <label class="checkbox-item" data-value="nenhuma">
+ <input type="checkbox" name="lesoes" value="nenhuma" />
+ <div>Nenhuma limitação</div>
+ </label>
+ </div>
+ </div>
+
+ <div class="card">
+ <h2>Condições médicas (opcional)</h2>
+ <label for="anam-condicoes">Descreva qualquer condição relevante</label>
+ <textarea id="anam-condicoes" rows="3" placeholder="Ex: pressão alta, diabetes, asma..." style="width:100%;padding:12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-size:16px;resize:vertical;font-family:inherit;"></textarea>
+ </div>
+ <div class="btn-row">
+ <button type="button" class="btn-secondary" onclick="prevStep()">Voltar</button>
+ <button type="button" class="btn-primary" onclick="nextStep()">Próximo</button>
+ </div>
+ </section>
+
+ <!-- Step 5: Equipamentos -->
+ <section class="step-content" data-step="5">
+ <div class="card">
+ <h2>Equipamentos disponíveis</h2>
+ <div class="checkbox-group" id="equip-group">
+ <label class="checkbox-item" data-value="academia_completa">
+ <input type="checkbox" name="equip" value="academia_completa" />
+ <div>Academia completa (máquinas, pesos livres, cabos)</div>
+ </label>
+ <label class="checkbox-item" data-value="pesos_livres">
+ <input type="checkbox" name="equip" value="pesos_livres" />
+ <div>Apenas pesos livres (halteres, barras)</div>
+ </label>
+ <label class="checkbox-item" data-value="corporal">
+ <input type="checkbox" name="equip" value="corporal" />
+ <div>Apenas peso corporal</div>
+ </label>
+ <label class="checkbox-item" data-value="elastico">
+ <input type="checkbox" name="equip" value="elastico" />
+ <div>Elásticos/bands de resistência</div>
+ </label>
+ <label class="checkbox-item" data-value="barra_fixa">
+ <input type="checkbox" name="equip" value="barra_fixa" />
+ <div>Barra fixa</div>
+ </label>
+ </div>
+ </div>
+ <div class="btn-row">
+ <button type="button" class="btn-secondary" onclick="prevStep()">Voltar</button>
+ <button type="button" class="btn-primary" onclick="nextStep()">Próximo</button>
+ </div>
+ </section>
+
+ <!-- Step 6: Metas e Expectativas -->
+ <section class="step-content" data-step="6">
+ <div class="card">
+ <h2>Meta de peso (opcional)</h2>
+ <label for="anam-peso-meta">Peso desejado (kg)</label>
+ <input type="number" id="anam-peso-meta" min="40" max="200" step="0.1" placeholder="Ex: 75.0" />
+
+ <label for="anam-prazo">Prazo para atingir a meta</label>
+ <select id="anam-prazo">
+ <option value="">Não tenho prazo definido</option>
+ <option value="3meses">3 meses</option>
+ <option value="6meses">6 meses</option>
+ <option value="1ano">1 ano</option>
+ </select>
+ </div>
+
+ <div class="card">
+ <h2>Observações adicionais</h2>
+ <textarea id="anam-observacoes" rows="3" placeholder="Algo que gostaria que seu personal soubesse?" style="width:100%;padding:12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-size:16px;resize:vertical;font-family:inherit;"></textarea>
+ </div>
+ <div class="btn-row">
+ <button type="button" class="btn-secondary" onclick="prevStep()">Voltar</button>
+ <button type="button" class="btn-primary" onclick="finishAnamnese()">Concluir e Exportar</button>
+ </div>
+ </section>
+ </main>
+ </div>
+
+ <script src="anamnese.js"></script>
+</body>
+</html>
