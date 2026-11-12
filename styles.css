@@ -264,3 +264,132 @@ select {
  height: 100%;
  border: none;
 }
+
+/* Interactive exercise card */
+.exercise-card-header.clickable {
+ cursor: pointer;
+ padding: 12px;
+ margin: -16px -16px 12px -16px;
+ border-radius: 14px 14px 0 0;
+ transition: background 0.2s;
+}
+.exercise-card-header.clickable:active {
+ background: rgba(200, 230, 50, 0.05);
+}
+.play-icon {
+ font-size: 24px;
+ color: var(--accent);
+ flex-shrink: 0;
+ transition: transform 0.2s;
+}
+.exercise-card-header.clickable:active .play-icon {
+ transform: scale(1.2);
+}
+
+/* Video wrapper with animation */
+.video-wrapper {
+ max-height: 0;
+ overflow: hidden;
+ transition: max-height 0.4s ease, opacity 0.3s ease;
+ opacity: 0;
+ margin-bottom: 0;
+}
+.video-wrapper.open {
+ max-height: 300px;
+ opacity: 1;
+ margin-bottom: 12px;
+}
+.video-loading {
+ padding: 24px;
+ text-align: center;
+ color: var(--text-secondary);
+ font-size: 14px;
+}
+.video-container {
+ border-radius: 12px;
+ overflow: hidden;
+ background: #000;
+ aspect-ratio: 16 / 9;
+}
+.video-container iframe,
+.video-container video {
+ width: 100%;
+ height: 100%;
+ border: none;
+ display: block;
+}
+.video-container.video-search {
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ background: var(--bg-primary);
+ border: 1px dashed var(--border);
+}
+.video-container.video-search a {
+ color: var(--accent);
+ text-decoration: none;
+ font-size: 14px;
+ font-weight: 600;
+ padding: 16px;
+ text-align: center;
+}
+
+/* Variant selector buttons */
+.variant-selector {
+ display: flex;
+ gap: 8px;
+ margin-bottom: 12px;
+ flex-wrap: wrap;
+}
+.variant-btn {
+ flex: 1;
+ min-width: 120px;
+ padding: 8px 12px;
+ background: var(--bg-primary);
+ color: var(--text-secondary);
+ border: 1px solid var(--border);
+ border-radius: 8px;
+ font-size: 12px;
+ font-weight: 600;
+ cursor: pointer;
+ transition: all 0.2s;
+ text-align: center;
+}
+.variant-btn.active {
+ background: var(--accent);
+ color: var(--bg-primary);
+ border-color: var(--accent);
+}
+.variant-btn:active {
+ transform: scale(0.97);
+}
+
+/* Mark done button */
+.btn-mark-done {
+ width: 100%;
+ padding: 12px;
+ margin-top: 12px;
+ background: transparent;
+ color: var(--text-secondary);
+ border: 1px solid var(--border);
+ border-radius: 10px;
+ font-size: 14px;
+ font-weight: 600;
+ cursor: pointer;
+ transition: all 0.2s;
+}
+.btn-mark-done.checked {
+ background: var(--accent);
+ color: var(--bg-primary);
+ border-color: var(--accent);
+}
+.btn-mark-done:active {
+ transform: scale(0.98);
+}
+
+/* Exercise GIF fallback */
+.exercise-gif {
+ width: 100%;
+ height: 100%;
+ object-fit: cover;
+}

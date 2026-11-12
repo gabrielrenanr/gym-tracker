@@ -11,7 +11,8 @@
  completedWorkouts: 'gym_completed_workouts',
  personalSettings: 'gym_personal_settings',
  exerciseCache: 'gym_exercise_cache',
- realizedWeights: 'gym_realized_weights'
+ realizedWeights: 'gym_realized_weights',
+ selectedVariant: 'gym_selected_variant'
  };
 
  function load(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
@@ -23,11 +24,116 @@
  }
  function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
- // --- YOUTUBE VIDEO EMBED FOR EXERCISES ---
- function getYouTubeEmbedUrl(exerciseName) {
- // Use YouTube search embed - shows first result for the exercise
- const searchQuery = encodeURIComponent(exerciseName + ' execução correta como fazer');
- return `https://www.youtube.com/embed?listType=search&list=${searchQuery}`;
+ // --- CURATED YOUTUBE VIDEO IDs ---
+ // Known reliable exercise tutorial videos (PT-BR and EN)
+ const CURATED_VIDEOS = {
+ 'supino reto': 'rT7DgkrQh3k',
+ 'supino reto com barra': 'rT7DgkrQh3k',
+ 'supino inclinado': 'DbF8tP7v0RE',
+ 'supino inclinado com halteres': 'DbF8tP7v0RE',
+ 'crucifixo': '2M97L1yZ8Ys',
+ 'crucifixo na polia': '2M97L1yZ8Ys',
+ 'peck deck': '1ah2Rn41VJU',
+ 'flexão': 'IODxDxX7oi4',
+ 'flexão de braço': 'IODxDxDx7oi4',
+ 'tríceps testa': 'nxVQwMb0bBk',
+ 'tríceps corda': 'vRQLT-ZXvQk',
+ 'tríceps pulley': 'vRQLT-ZXvQk',
+ 'tríceps francês': 'XNr3E2Zz8Yw',
+ 'puxada frontal': 'CAwf7n6Luuc',
+ 'puxada': 'CAwf7n6Luuc',
+ 'barra fixa': 'eGo4IYlbE5g',
+ 'remada curvada': 'FWJR5Ve8bnQ',
+ 'remada': 'FWJR5Ve8bnQ',
+ 'remada unilateral': 'pYcpY20CfE8',
+ 'remada serrote': 'pYcpY20CfE8',
+ 'remada baixa': 'xN3CQzo69Yk',
+ 'rosca direta': 'kwG2ipFRgFo',
+ 'rosca': 'kwG2ipFRgFo',
+ 'rosca martelo': 'zC3nLlEvin4',
+ 'rosca alternada': 'sJnNTHwNtSg',
+ 'desenvolvimento militar': 'qEwKRC5J4PQ',
+ 'desenvolvimento': 'qEwKRC5J4PQ',
+ 'elevação lateral': '3VcKaXpzqRo',
+ 'elevação posterior': 'Q8eC2X5gRZk',
+ 'voador invertido': 'Q8eC2X5gRZk',
+ 'encolhimento': 'g6qbq4Lf1FI',
+ 'face pull': 'f9uV3oIwJHk',
+ 'agachamento': 'UltC28oPGEI',
+ 'agachamento livre': 'UltC28oPGEI',
+ 'leg press': 'IZxyjW7MPJQ',
+ 'stiff': 'CN_7czRBn-0',
+ 'cadeira extensora': 'YyvSfVjQeL0',
+ 'extensora': 'YyvSfVjQeL0',
+ 'mesa flexora': '1Toa48yXmEg',
+ 'flexora': '1Toa48yXmEg',
+ 'afundo': 'QOVaHnm-NrA',
+ 'panturrilha': 'gwLz5YoWx4M',
+ 'panturrilha em pé': 'gwLz5YoWx4M',
+ 'abdominal': '1fbU_MkVvNE',
+ 'prancha': 'pSHjTRCQxIw',
+ 'prancha frontal': 'pSHjTRCQxIw',
+ 'esteira': 'xvo1R2oJj78',
+ 'bicicleta': 't4hBnal0QoA'
+ };
+
+ // Giphy API public beta key (for GIF fallback)
+ const GIPHY_KEY = 'dc6zaTOxFJmzC';
+
+ // Get video/GIF for an exercise name
+ async function getExerciseMedia(exerciseName) {
+ const cache = load(KEYS.exerciseCache) || {};
+ const cacheKey = exerciseName.toLowerCase().trim();
+ 
+ if (cache[cacheKey]) return cache[cacheKey];
+
+ const lowerName = cacheKey;
+
+ // 1) Try curated YouTube video IDs
+ for (const [key, videoId] of Object.entries(CURATED_VIDEOS)) {
+ if (lowerName.includes(key) || key.includes(lowerName)) {
+ const result = { type: 'youtube', videoId };
+ cache[cacheKey] = result;
+ save(KEYS.exerciseCache, cache);
+ return result;
+ }
+ }
+
+ // 2) Fallback: search Giphy for animated GIF
+ try {
+ const giphyUrl = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(exerciseName + ' exercise workout')}&limit=5&rating=g&lang=en`;
+ const response = await fetch(giphyUrl);
+ if (response.ok) {
+ const data = await response.json();
+ if (data.data && data.data.length > 0) {
+ // Pick the one with best aspect ratio for exercise
+ const gif = data.data.find(g => g.images.fixed_width) || data.data[0];
+ const result = { 
+ type: 'gif', 
+ url: gif.images.fixed_width.url,
+ mp4: gif.images.fixed_width.mp4
+ };
+ cache[cacheKey] = result;
+ save(KEYS.exerciseCache, cache);
+ return result;
+ }
+ }
+ } catch (e) {
+ console.log('Giphy fetch failed');
+ }
+
+ // 3) Final fallback: YouTube search link
+ const result = { type: 'youtube-search', query: exerciseName + ' execução' };
+ cache[cacheKey] = result;
+ save(KEYS.exerciseCache, cache);
+ return result;
+ }
+
+ async function preloadMedia(exercises) {
+ if (!exercises) return;
+ const all = exercises.flatMap(ex => [ex.nome, ex.alternativa].filter(Boolean));
+ const unique = [...new Set(all)];
+ await Promise.all(unique.map(name => getExerciseMedia(name)));
  }
 
  // --- ONBOARDING CHECK ---
@@ -87,7 +193,7 @@
  const file = e.target.files[0];
  if (!file) return;
  const reader = new FileReader();
- reader.onload = (ev) => {
+ reader.onload = async (ev) => {
  try {
  const plan = JSON.parse(ev.target.result);
  if (!plan.dias || !Array.isArray(plan.dias)) throw new Error('Formato inválido');
@@ -97,8 +203,13 @@
  save(KEYS.personalSettings, plan.configuracoesPersonal);
  }
  
- uploadStatus.textContent = '✓ Ficha carregada com sucesso!';
+ uploadStatus.textContent = '✓ Ficha carregada! Buscando vídeos...';
  uploadStatus.style.color = 'var(--accent)';
+ 
+ const allExercises = plan.dias.flatMap(d => d.exercicios || []);
+ await preloadMedia(allExercises);
+ 
+ uploadStatus.textContent = '✓ Ficha pronta com vídeos!';
  renderTodayWorkout();
  setTimeout(() => { uploadStatus.textContent = ''; }, 3000);
  } catch (err) {
@@ -110,7 +221,7 @@
  });
 
  // --- TODAY WORKOUT ---
- function renderTodayWorkout() {
+ async function renderTodayWorkout() {
  const plan = load(KEYS.workoutPlan);
  const container = document.getElementById('today-workout-container');
  const noMsg = document.getElementById('no-workout-msg');
@@ -145,43 +256,38 @@
  badgeEl.textContent = dayPlan.nome || ('Treino ' + dayName);
  badgeEl.className = 'workout-badge active';
 
+ await preloadMedia(dayPlan.exercicios);
+
  const completed = load(KEYS.completedWorkouts) || {};
  const realizedWeights = load(KEYS.realizedWeights) || {};
+ const selectedVariants = load(KEYS.selectedVariant) || {};
  const todayKey = todayStr();
  if (!completed[todayKey]) completed[todayKey] = [];
 
  listEl.innerHTML = dayPlan.exercicios.map((ex, i) => {
  const isDone = completed[todayKey].includes(i);
- const videoUrl = getYouTubeEmbedUrl(ex.nome);
- 
  const realizedKey = `${todayKey}_${i}`;
  const realizedWeight = realizedWeights[realizedKey] || '';
- 
+ const variantKey = `${todayKey}_${i}`;
+ const currentVariant = selectedVariants[variantKey] || 'original';
+ const hasAlternative = !!ex.alternativa;
+
  return `
  <div class="exercise-card ${isDone ? 'done' : ''}" data-index="${i}">
- <div class="exercise-video-section">
- <button class="btn-show-video" onclick="toggleVideo(${i})">
- 📹 Ver vídeo de execução
- </button>
- <div class="video-container" id="video-${i}" style="display:none;">
- <iframe 
- src="${videoUrl}" 
- frameborder="0" 
- allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
- allowfullscreen
- loading="lazy">
- </iframe>
- </div>
- </div>
- <div class="exercise-card-header">
+ <div class="exercise-card-header clickable" onclick="toggleVideo(${i})">
  <div class="exercise-title">
  <h3>${escapeHtml(ex.nome)}</h3>
  <p class="exercise-target">${escapeHtml(ex.grupoMuscular || '')}</p>
  </div>
- <button class="btn-check ${isDone ? 'checked' : ''}" onclick="toggleExercise(${i})" aria-label="Concluir">
- ${isDone ? '✓' : '○'}
- </button>
+ <div class="play-icon">▶</div>
  </div>
+ <div class="video-wrapper" id="video-wrapper-${i}"></div>
+ ${hasAlternative ? `
+ <div class="variant-selector">
+ <button class="variant-btn ${currentVariant === 'original' ? 'active' : ''}" onclick="selectVariant(${i}, 'original')">Original</button>
+ <button class="variant-btn ${currentVariant === 'alternative' ? 'active' : ''}" onclick="selectVariant(${i}, 'alternative')">Alternativa: ${escapeHtml(ex.alternativa)}</button>
+ </div>
+ ` : ''}
  <div class="exercise-details">
  <div class="detail-item"><span class="detail-label">Séries</span><span class="detail-value">${ex.series}</span></div>
  <div class="detail-item"><span class="detail-label">Reps</span><span class="detail-value">${ex.repeticoes}</span></div>
@@ -190,21 +296,108 @@
  </div>
  <div class="realized-weight-section">
  <label for="realized-${i}">Peso realizado (kg):</label>
- <input type="number" id="realized-${i}" class="realized-input" value="${realizedWeight}" placeholder="${ex.cargaKg || ''}" step="0.5" min="0" onchange="saveRealizedWeight(${i}, this.value)" />
+ <input type="number" id="realized-${i}" class="realized-input" value="${realizedWeight}" placeholder="${ex.cargaKg || ''}" step="0.5" min="0" onchange="saveRealizedWeight(${i}, this.value)" onclick="event.stopPropagation()" />
  </div>
- ${ex.alternativa ? `<div class="exercise-alt"><strong>Alternativa:</strong> ${escapeHtml(ex.alternativa)}</div>` : ''}
  ${ex.obs ? `<div class="exercise-obs">💡 ${escapeHtml(ex.obs)}</div>` : ''}
+ <button class="btn-mark-done ${isDone ? 'checked' : ''}" onclick="toggleExercise(${i})">
+ ${isDone ? '✓ Concluído' : 'Marcar como concluído'}
+ </button>
  </div>
  `;
  }).join('');
+
+ // Auto-expand first incomplete exercise for better UX
+ const firstIncomplete = dayPlan.exercicios.findIndex((_, i) => !completed[todayKey].includes(i));
+ if (firstIncomplete >= 0) {
+ setTimeout(() => toggleVideo(firstIncomplete, true), 100);
+ }
  }
 
- window.toggleVideo = function(index) {
- const videoContainer = document.getElementById(`video-${index}`);
- if (videoContainer.style.display === 'none') {
- videoContainer.style.display = 'block';
+ window.toggleVideo = function(index, forceOpen = false) {
+ const wrapper = document.getElementById(`video-wrapper-${index}`);
+ if (!wrapper) return;
+ 
+ const isOpen = wrapper.classList.contains('open');
+ if (isOpen && !forceOpen) {
+ wrapper.classList.remove('open');
+ wrapper.innerHTML = '';
+ return;
+ }
+ 
+ wrapper.classList.add('open');
+ loadVideoForExercise(index);
+ };
+
+ async function loadVideoForExercise(index) {
+ const plan = load(KEYS.workoutPlan);
+ const dayName = getDayName();
+ const dayPlan = plan.dias.find(d =>
+ d.dia.toLowerCase() === dayName.toLowerCase() ||
+ d.dia.toLowerCase().includes(dayName.toLowerCase().substring(0,3))
+ );
+ if (!dayPlan) return;
+ 
+ const ex = dayPlan.exercicios[index];
+ if (!ex) return;
+ 
+ const wrapper = document.getElementById(`video-wrapper-${index}`);
+ const selectedVariants = load(KEYS.selectedVariant) || {};
+ const variantKey = `${todayStr()}_${index}`;
+ const currentVariant = selectedVariants[variantKey] || 'original';
+ const exerciseName = currentVariant === 'alternative' && ex.alternativa ? ex.alternativa : ex.nome;
+ 
+ wrapper.innerHTML = '<div class="video-loading">Carregando vídeo...</div>';
+ 
+ const media = await getExerciseMedia(exerciseName);
+ 
+ if (media.type === 'youtube') {
+ wrapper.innerHTML = `
+ <div class="video-container">
+ <iframe 
+ src="https://www.youtube.com/embed/${media.videoId}?autoplay=1&rel=0" 
+ allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+ allowfullscreen>
+ </iframe>
+ </div>
+ `;
+ } else if (media.type === 'gif') {
+ wrapper.innerHTML = `
+ <div class="video-container">
+ ${media.mp4 
+ ? `<video autoplay loop muted playsinline><source src="${media.mp4}" type="video/mp4"></video>`
+ : `<img src="${media.url}" alt="${escapeHtml(exerciseName)}" class="exercise-gif" />`}
+ </div>
+ `;
  } else {
- videoContainer.style.display = 'none';
+ // YouTube search fallback - clickable link
+ wrapper.innerHTML = `
+ <div class="video-container video-search">
+ <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(media.query)}" target="_blank" rel="noopener">
+ 🔍 Buscar "${escapeHtml(exerciseName)}" no YouTube
+ </a>
+ </div>
+ `;
+ }
+ }
+
+ window.selectVariant = function(index, variant) {
+ const selectedVariants = load(KEYS.selectedVariant) || {};
+ const variantKey = `${todayStr()}_${index}`;
+ selectedVariants[variantKey] = variant;
+ save(KEYS.selectedVariant, selectedVariants);
+ 
+ // Re-render the card and load new video
+ const wrapper = document.getElementById(`video-wrapper-${index}`);
+ if (wrapper && wrapper.classList.contains('open')) {
+ loadVideoForExercise(index);
+ }
+ 
+ // Update button states
+ const card = document.querySelector(`.exercise-card[data-index="${index}"]`);
+ if (card) {
+ card.querySelectorAll('.variant-btn').forEach(btn => btn.classList.remove('active'));
+ const targetBtn = card.querySelector(`.variant-btn[onclick*="'${variant}'"]`);
+ if (targetBtn) targetBtn.classList.add('active');
  }
  };
 
@@ -360,15 +553,12 @@
  document.getElementById('weekly-notes').value = savedNotes;
  }
 
- // --- MUSCLE CHART (SVG) ---
  function renderMuscleChart(weekDates, completed, plan) {
  const container = document.getElementById('muscle-chart-container');
- 
  if (!plan || !plan.dias) {
  container.innerHTML = '<p class="hint">Carregue uma ficha de treino para ver os músculos.</p>';
  return;
  }
-
  const muscleCounts = {};
  weekDates.forEach(date => {
  if (!completed[date]) return;
@@ -378,7 +568,6 @@
  d.dia.toLowerCase().includes(dayName.toLowerCase().substring(0,3))
  );
  if (!dayPlan || !dayPlan.exercicios) return;
- 
  completed[date].forEach(idx => {
  const ex = dayPlan.exercicios[idx];
  if (ex && ex.grupoMuscular) {
@@ -387,20 +576,14 @@
  }
  });
  });
-
  const entries = Object.entries(muscleCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
  if (entries.length === 0) {
  container.innerHTML = '<p class="hint">Nenhum músculo registrado esta semana.</p>';
  return;
  }
-
  const maxCount = Math.max(...entries.map(e => e[1]));
- const barHeight = 24;
- const gap = 8;
- const labelWidth = 120;
- const chartWidth = 280;
+ const barHeight = 24, gap = 8, labelWidth = 120, chartWidth = 280;
  const height = entries.length * (barHeight + gap) + 20;
-
  const bars = entries.map(([name, count], i) => {
  const y = i * (barHeight + gap) + 10;
  const barW = (count / maxCount) * (chartWidth - labelWidth - 40);
@@ -410,22 +593,17 @@
  <text x="${labelWidth + barW + 6}" y="${y + barHeight/2 + 4}" fill="var(--text-secondary)" font-size="11">${count}x</text>
  `;
  }).join('');
-
  container.innerHTML = `<svg viewBox="0 0 ${chartWidth} ${height}" class="chart-svg">${bars}</svg>`;
  }
 
- // --- STRESS CHART (SVG) - IMPROVED ---
  function renderStressChart(weekDates, completed, plan) {
  const container = document.getElementById('stress-chart-container');
- 
  if (!plan || !plan.dias) {
  container.innerHTML = '<p class="hint">Carregue uma ficha de treino para ver o stress muscular.</p>';
  return;
  }
-
  const muscleStress = {};
  const largeMuscles = ['Peitoral', 'Dorsal', 'Quadríceps', 'Glúteos', 'Posterior'];
- 
  weekDates.forEach(date => {
  if (!completed[date]) return;
  const dayName = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' });
@@ -434,59 +612,40 @@
  d.dia.toLowerCase().includes(dayName.toLowerCase().substring(0,3))
  );
  if (!dayPlan || !dayPlan.exercicios) return;
- 
  completed[date].forEach(idx => {
  const ex = dayPlan.exercicios[idx];
  if (!ex || !ex.grupoMuscular) return;
- 
  const group = ex.grupoMuscular.split('/')[0].trim();
  const sets = parseInt(ex.series) || 3;
  const reps = parseInt(String(ex.repeticoes).split('-')[0]) || 10;
  const weight = parseFloat(ex.cargaKg) || 0;
  const volume = sets * reps * weight;
- 
  const isLarge = largeMuscles.some(m => group.includes(m));
  const recoveryFactor = isLarge ? 72 : 48;
  const stressScore = volume / recoveryFactor;
- 
  muscleStress[group] = (muscleStress[group] || 0) + stressScore;
  });
  });
-
  const entries = Object.entries(muscleStress).sort((a,b) => b[1] - a[1]).slice(0, 8);
  if (entries.length === 0) {
  container.innerHTML = '<p class="hint">Nenhum dado de stress esta semana.</p>';
  return;
  }
-
  const maxStress = Math.max(...entries.map(e => e[1]), 100);
- const barHeight = 28;
- const gap = 10;
- const labelWidth = 120;
- const chartWidth = 300;
+ const barHeight = 28, gap = 10, labelWidth = 120, chartWidth = 300;
  const height = entries.length * (barHeight + gap) + 40;
-
  const bars = entries.map(([name, stress], i) => {
  const y = i * (barHeight + gap) + 10;
  const barW = Math.max((stress / maxStress) * (chartWidth - labelWidth - 50), 10);
- 
- let color = 'var(--accent)';
- let zone = 'Baixo';
- if (stress > 100) {
- color = '#ff4d4d';
- zone = 'Alto';
- } else if (stress > 50) {
- color = '#ffa500';
- zone = 'Médio';
- }
- 
+ let color = 'var(--accent)', zone = 'Baixo';
+ if (stress > 100) { color = '#ff4d4d'; zone = 'Alto'; }
+ else if (stress > 50) { color = '#ffa500'; zone = 'Médio'; }
  return `
  <text x="${labelWidth - 8}" y="${y + barHeight/2 + 5}" fill="var(--text-primary)" font-size="12" font-weight="600" text-anchor="end">${escapeHtml(name.substring(0,20))}</text>
  <rect x="${labelWidth}" y="${y}" width="${barW}" height="${barHeight}" rx="6" fill="${color}" opacity="0.85"/>
  <text x="${labelWidth + barW + 8}" y="${y + barHeight/2 + 5}" fill="var(--text-secondary)" font-size="11" font-weight="600">${Math.round(stress)} (${zone})</text>
  `;
  }).join('');
-
  const legend = `
  <g transform="translate(${labelWidth}, ${height - 25})">
  <rect x="0" y="0" width="12" height="12" rx="2" fill="var(--accent)" opacity="0.85"/>
@@ -497,14 +656,12 @@
  <text x="186" y="10" fill="var(--text-secondary)" font-size="10">Alto (&gt;100)</text>
  </g>
  `;
-
  container.innerHTML = `<svg viewBox="0 0 ${chartWidth} ${height}" class="chart-svg">${bars}${legend}</svg>`;
  }
 
  window.exportWeeklyReport = function() {
  const notes = document.getElementById('weekly-notes').value.trim();
  localStorage.setItem(KEYS.weeklyNotes, notes);
-
  const completed = load(KEYS.completedWorkouts) || {};
  const weights = load(KEYS.weightLog) || [];
  const hydration = load(KEYS.hydration) || {};
@@ -512,25 +669,20 @@
  const plan = load(KEYS.workoutPlan) || {};
  const settings = load(KEYS.personalSettings) || {};
  const realizedWeights = load(KEYS.realizedWeights) || {};
-
  const now = new Date();
  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
  const weekDates = [];
  for (let d = new Date(weekAgo); d <= now; d.setDate(d.getDate() + 1)) {
  weekDates.push(d.toISOString().slice(0, 10));
  }
-
  const realizedWeightsWeek = {};
  weekDates.forEach(date => {
  const dayCompleted = completed[date] || [];
  dayCompleted.forEach(idx => {
  const key = `${date}_${idx}`;
- if (realizedWeights[key]) {
- realizedWeightsWeek[key] = realizedWeights[key];
- }
+ if (realizedWeights[key]) realizedWeightsWeek[key] = realizedWeights[key];
  });
  });
-
  const report = {
  tipo: 'relatorio_semanal',
  periodo: { inicio: weekDates[0], fim: weekDates[weekDates.length - 1] },
@@ -550,7 +702,6 @@
  pesosRealizados: realizedWeightsWeek,
  observacoes: notes
  };
-
  const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
  const url = URL.createObjectURL(blob);
  const a = document.createElement('a');
@@ -562,14 +713,10 @@
  URL.revokeObjectURL(url);
  };
 
- // --- PROFILE ---
  function renderProfile() {
  const anamnese = load(KEYS.anamnese) || {};
  const display = document.getElementById('profile-display');
- if (!anamnese.nome) {
- display.innerHTML = '<p class="hint">Perfil não encontrado.</p>';
- return;
- }
+ if (!anamnese.nome) { display.innerHTML = '<p class="hint">Perfil não encontrado.</p>'; return; }
  display.innerHTML = `
  <div class="profile-row"><strong>Nome:</strong> ${escapeHtml(anamnese.nome)}</div>
  <div class="profile-row"><strong>Idade:</strong> ${anamnese.idade} anos</div>
@@ -580,7 +727,6 @@
  <div class="profile-row"><strong>Dias/semana:</strong> ${anamnese.diasSemana}</div>
  ${anamnese.lesoes && anamnese.lesoes.length ? '<div class="profile-row"><strong>Limitações:</strong> ' + anamnese.lesoes.join(', ') + '</div>' : ''}
  `;
-
  const settings = load(KEYS.personalSettings) || {};
  const settingsEl = document.getElementById('personal-settings-display');
  if (Object.keys(settings).length === 0) {
@@ -593,7 +739,6 @@
  ${settings.obs ? `<div class="profile-row"><strong>Obs. do personal:</strong> ${escapeHtml(settings.obs)}</div>` : ''}
  `;
  }
-
  const weights = load(KEYS.weightLog) || [];
  const completed = load(KEYS.completedWorkouts) || {};
  const statsEl = document.getElementById('stats-display');
@@ -615,6 +760,5 @@
  }
  };
 
- // --- INIT ---
  renderTodayWorkout();
 })();
